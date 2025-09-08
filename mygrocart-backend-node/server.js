@@ -37,7 +37,12 @@ async function startServer() {
 
   // Apply global middleware
   app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:5173'], // Allow React dev servers
+    origin: [
+      'http://localhost:3000', 
+      'http://localhost:5173',
+      'https://mygrocart-frontend.onrender.com',
+      'https://mygrocart.onrender.com'
+    ], // Allow React dev servers and production domains
     credentials: true
   }));
   app.use(express.json()); // Parse JSON bodies for all routes
