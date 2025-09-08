@@ -7,6 +7,7 @@ const httpLink = createHttpLink({
   uri: import.meta.env.VITE_GRAPHQL_ENDPOINT || '/graphql',
   fetchOptions: {
     mode: 'cors',
+    credentials: 'omit',
   },
 });
 
