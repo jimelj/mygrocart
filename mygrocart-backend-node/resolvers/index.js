@@ -176,37 +176,55 @@ const resolvers = {
 
   Mutation: {
     signup: async (_, { email, password, address, city, state, zipCode, travelRadiusMiles }) => {
-      // Check if user already exists
-      const existingUser = await User.findOne({ where: { email } });
-      if (existingUser) {
-        throw new Error('User with this email already exists');
+      try {
+        // Check if user already exists
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) {
+          throw new Error('User with this email already exists');
+        }
+
+        // Mock geocoding
+        const { latitude, longitude } = mockGeocode(address, city, state, zipCode);
+
+        // Create new user (password will be hashed by the model hook)
+        const newUser = await User.create({
+          email,
+          password,
+          address,
+          city,
+          state,
+          zipCode,
+          latitude,
+          longitude,
+          travelRadiusMiles
+        });
+
+        // Generate token
+        const token = generateToken(newUser.userId);
+
+        // Return user without password
+        const { password: userPassword, ...userWithoutPassword } = newUser.toJSON();
+        return {
+          token,
+          user: userWithoutPassword
+        };
+      } catch (error) {
+        console.error('Signup error:', error.message);
+        
+        // Handle validation errors
+        if (error.name === 'SequelizeValidationError') {
+          const messages = error.errors.map(err => err.message).join(', ');
+          throw new Error(messages);
+        }
+        
+        // Handle unique constraint errors
+        if (error.name === 'SequelizeUniqueConstraintError') {
+          throw new Error('An account with this email already exists');
+        }
+        
+        // Re-throw other errors
+        throw error;
       }
-
-      // Mock geocoding
-      const { latitude, longitude } = mockGeocode(address, city, state, zipCode);
-
-      // Create new user (password will be hashed by the model hook)
-      const newUser = await User.create({
-        email,
-        password,
-        address,
-        city,
-        state,
-        zipCode,
-        latitude,
-        longitude,
-        travelRadiusMiles
-      });
-
-      // Generate token
-      const token = generateToken(newUser.userId);
-
-      // Return user without password
-      const { password: userPassword, ...userWithoutPassword } = newUser.toJSON();
-      return {
-        token,
-        user: userWithoutPassword
-      };
     },
 
     login: async (_, { email, password }) => {

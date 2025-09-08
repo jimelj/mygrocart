@@ -39,6 +39,13 @@ const AuthForm = ({ showSignup = false, onBack }) => {
     setLoading(true);
     setError('');
 
+    // Frontend validation
+    if (!isLogin && formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
     try {
       let result;
       if (isLogin) {
@@ -51,7 +58,14 @@ const AuthForm = ({ showSignup = false, onBack }) => {
         setError(result.error);
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error('Auth error:', err);
+      if (err.message && err.message.includes('400')) {
+        setError('Invalid email or password. Please check your credentials.');
+      } else if (err.message && err.message.includes('User with this email already exists')) {
+        setError('An account with this email already exists. Please try logging in instead.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -99,11 +113,17 @@ const AuthForm = ({ showSignup = false, onBack }) => {
               <Input
                 type="password"
                 name="password"
-                placeholder="Password"
+                placeholder={isLogin ? "Password" : "Password (min 6 characters)"}
                 value={formData.password}
                 onChange={handleChange}
                 required
+                minLength={6}
               />
+              {!isLogin && formData.password && formData.password.length < 6 && (
+                <p className="text-sm text-red-600 mt-1">
+                  Password must be at least 6 characters long
+                </p>
+              )}
             </div>
 
             {!isLogin && (
