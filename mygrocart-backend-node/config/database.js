@@ -1,4 +1,9 @@
 const { Sequelize } = require('sequelize');
+const pg = require('pg');
+
+// Enforce SSL at the driver level without disabling global TLS checks
+// This is required for providers that use self-signed certs (e.g., Render Postgres)
+pg.defaults.ssl = { require: true, rejectUnauthorized: false };
 
 // Handle DATABASE_URL with SSL parameters
 let databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
@@ -11,13 +16,12 @@ if (process.env.NODE_ENV === 'production' && !databaseUrl.includes('sslmode')) {
 
 const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
+  dialectModule: pg,
   logging: false,
   dialectOptions: process.env.NODE_ENV === 'production' ? {
     ssl: {
       require: true,
-      rejectUnauthorized: false,
-      // Additional SSL options for better compatibility
-      sslmode: 'require'
+      rejectUnauthorized: false
     }
   } : {},
   pool: {
@@ -25,13 +29,7 @@ const sequelize = new Sequelize(databaseUrl, {
     min: 0,
     acquire: 30000,
     idle: 10000
-  },
-  // Additional options for production
-  ...(process.env.NODE_ENV === 'production' && {
-    define: {
-      timestamps: true
-    }
-  })
+  }
 });
 
 const connectDB = async () => {
