@@ -1,18 +1,15 @@
 const { Sequelize } = require('sequelize');
 
-// Parse DATABASE_URL to handle SSL properly
-const databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
-const isProduction = process.env.NODE_ENV === 'production';
-
-const sequelize = new Sequelize(databaseUrl, {
+// Simple configuration that works with Render
+const sequelize = new Sequelize(process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart', {
   dialect: 'postgres',
-  logging: false, // Set to console.log to see SQL queries
-  dialectOptions: isProduction ? {
-    ssl: {
+  logging: false,
+  dialectOptions: {
+    ssl: process.env.NODE_ENV === 'production' ? {
       require: true,
       rejectUnauthorized: false
-    }
-  } : {},
+    } : false
+  },
   pool: {
     max: 5,
     min: 0,
@@ -36,12 +33,8 @@ const connectDB = async () => {
   } catch (error) {
     console.error('Database connection error:', error);
     console.error('Error details:', error.message);
-    if (process.env.NODE_ENV === 'production') {
-      console.error('Failing to start server due to database connection error');
-      process.exit(1);
-    } else {
-      console.log('Continuing with in-memory data for development...');
-    }
+    console.log('Server will continue without database connection...');
+    console.log('Authentication will use sample data until database is fixed');
   }
 };
 
