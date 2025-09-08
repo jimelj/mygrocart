@@ -12,12 +12,12 @@ if (process.env.NODE_ENV === 'production' && !databaseUrl.includes('sslmode')) {
 const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
   logging: false,
-  dialectOptions: {
-    ssl: process.env.NODE_ENV === 'production' ? {
+  dialectOptions: process.env.NODE_ENV === 'production' ? {
+    ssl: {
       require: true,
       rejectUnauthorized: false
-    } : false
-  },
+    }
+  } : {},
   pool: {
     max: 5,
     min: 0,
