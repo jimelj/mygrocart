@@ -9,6 +9,11 @@ const dotenv = require('dotenv');
 // Load environment variables
 dotenv.config();
 
+// Set NODE_ENV if not already set
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
 // Import GraphQL schema and resolvers
 const typeDefs = require('./schema/typeDefs');
 const resolvers = require('./resolvers');

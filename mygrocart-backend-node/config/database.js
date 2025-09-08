@@ -1,14 +1,18 @@
 const { Sequelize } = require('sequelize');
 
-const sequelize = new Sequelize(process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart', {
+// Parse DATABASE_URL to handle SSL properly
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
+const isProduction = process.env.NODE_ENV === 'production';
+
+const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
   logging: false, // Set to console.log to see SQL queries
-  dialectOptions: {
-    ssl: process.env.NODE_ENV === 'production' ? {
+  dialectOptions: isProduction ? {
+    ssl: {
       require: true,
       rejectUnauthorized: false
-    } : false
-  },
+    }
+  } : {},
   pool: {
     max: 5,
     min: 0,
