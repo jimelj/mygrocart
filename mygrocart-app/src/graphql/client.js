@@ -5,9 +5,22 @@ import { setContext } from '@apollo/client/link/context';
 // Use environment variable for production, relative path for development
 const httpLink = createHttpLink({
   uri: import.meta.env.VITE_GRAPHQL_ENDPOINT || '/graphql',
-  fetchOptions: {
-    mode: 'cors',
-    credentials: 'omit',
+  fetch: (uri, options) => {
+    // Custom fetch to handle SSL certificate issues
+    return fetch(uri, {
+      ...options,
+      mode: 'cors',
+      credentials: 'omit',
+      // Add headers to help with SSL issues
+      headers: {
+        ...options.headers,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    }).catch(error => {
+      console.error('Fetch error:', error);
+      throw error;
+    });
   },
 });
 
