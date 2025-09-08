@@ -8,11 +8,7 @@ pg.defaults.ssl = { require: true, rejectUnauthorized: false };
 // Handle DATABASE_URL with SSL parameters
 let databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
 
-// For production, ensure SSL parameters are in the URL
-if (process.env.NODE_ENV === 'production' && !databaseUrl.includes('sslmode')) {
-  const separator = databaseUrl.includes('?') ? '&' : '?';
-  databaseUrl = `${databaseUrl}${separator}sslmode=require`;
-}
+// Do NOT mutate the URL with sslmode — rely on pg SSL options only
 
 const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
