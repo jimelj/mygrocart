@@ -6,34 +6,64 @@ const pg = require('pg');
 pg.defaults.ssl = { require: true, rejectUnauthorized: false };
 
 // Handle DATABASE_URL with SSL parameters
-let databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
 
-// Do NOT mutate the URL with sslmode — rely on pg SSL options only
+// Parse URL and build a config object to avoid driver interpreting query params
+let sequelize;
+try {
+  const parsed = new URL(databaseUrl);
+  const username = decodeURIComponent(parsed.username || '');
+  const password = decodeURIComponent(parsed.password || '');
+  const host = parsed.hostname || 'localhost';
+  const port = parsed.port ? Number(parsed.port) : 5432;
+  const database = (parsed.pathname || '').replace(/^\//, '') || 'mygrocart';
 
-const sequelize = new Sequelize(databaseUrl, {
-  dialect: 'postgres',
-  dialectModule: pg,
-  logging: false,
-  dialectOptions: process.env.NODE_ENV === 'production' ? {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false
+  sequelize = new Sequelize(database, username, password, {
+    host,
+    port,
+    dialect: 'postgres',
+    dialectModule: pg,
+    logging: false,
+    dialectOptions: process.env.NODE_ENV === 'production' ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    } : {},
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
     }
-  } : {},
-  pool: {
-    max: 5,
-    min: 0,
-    acquire: 30000,
-    idle: 10000
-  }
-});
+  });
+} catch (e) {
+  // Fallback to URL form if parsing fails
+  sequelize = new Sequelize(databaseUrl, {
+    dialect: 'postgres',
+    dialectModule: pg,
+    logging: false,
+    dialectOptions: process.env.NODE_ENV === 'production' ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    } : {},
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  });
+}
 
 const connectDB = async () => {
   try {
     console.log('Attempting to connect to database...');
     console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
     console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
-    console.log('Database URL being used:', databaseUrl.replace(/\/\/.*@/, '//***:***@')); // Hide credentials in logs
+    console.log('Database URL being used:', (process.env.DATABASE_URL || '').replace(/\/\/.*@/, '//***:***@')); // Hide credentials in logs
     
     await sequelize.authenticate();
     console.log('PostgreSQL Connected');
