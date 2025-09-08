@@ -15,7 +15,9 @@ const sequelize = new Sequelize(databaseUrl, {
   dialectOptions: process.env.NODE_ENV === 'production' ? {
     ssl: {
       require: true,
-      rejectUnauthorized: false
+      rejectUnauthorized: false,
+      // Additional SSL options for better compatibility
+      sslmode: 'require'
     }
   } : {},
   pool: {
@@ -23,7 +25,13 @@ const sequelize = new Sequelize(databaseUrl, {
     min: 0,
     acquire: 30000,
     idle: 10000
-  }
+  },
+  // Additional options for production
+  ...(process.env.NODE_ENV === 'production' && {
+    define: {
+      timestamps: true
+    }
+  })
 });
 
 const connectDB = async () => {

@@ -14,10 +14,7 @@ if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = 'production';
 }
 
-// Disable SSL certificate verification for self-signed certificates
-if (process.env.NODE_ENV === 'production') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
+// Note: SSL certificate handling is now done in database.js with proper SSL configuration
 
 // Import GraphQL schema and resolvers
 const typeDefs = require('./schema/typeDefs');
