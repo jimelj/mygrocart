@@ -176,114 +176,57 @@ const resolvers = {
 
   Mutation: {
     signup: async (_, { email, password, address, city, state, zipCode, travelRadiusMiles }) => {
-      try {
-        // Check if user already exists
-        const existingUser = await User.findOne({ where: { email } });
-        if (existingUser) {
-          throw new Error('User with this email already exists');
-        }
-
-        // Mock geocoding
-        const { latitude, longitude } = mockGeocode(address, city, state, zipCode);
-
-        // Create new user (password will be hashed by the model hook)
-        const newUser = await User.create({
-          email,
-          password,
-          address,
-          city,
-          state,
-          zipCode,
-          latitude,
-          longitude,
-          travelRadiusMiles
-        });
-
-        // Generate token
-        const token = generateToken(newUser.userId);
-
-        // Return user without password
-        const { password: userPassword, ...userWithoutPassword } = newUser.toJSON();
-        return {
-          token,
-          user: userWithoutPassword
-        };
-      } catch (error) {
-        console.error('Database error during signup:', error.message);
-        
-        // Fallback to sample data when database fails
-        const sampleUser = sampleData.users.find(u => u.email === email);
-        if (sampleUser) {
-          throw new Error('User with this email already exists');
-        }
-        
-        // Create a new sample user
-        const newSampleUser = {
-          userId: uuidv4(),
-          email,
-          address,
-          city,
-          state,
-          zipCode,
-          latitude: 40.7128,
-          longitude: -74.0060,
-          travelRadiusMiles,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        // Add to sample data
-        sampleData.users.push(newSampleUser);
-        
-        // Generate token
-        const token = generateToken(newSampleUser.userId);
-        
-        return {
-          token,
-          user: newSampleUser
-        };
+      // Check if user already exists
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        throw new Error('User with this email already exists');
       }
+
+      // Mock geocoding
+      const { latitude, longitude } = mockGeocode(address, city, state, zipCode);
+
+      // Create new user (password will be hashed by the model hook)
+      const newUser = await User.create({
+        email,
+        password,
+        address,
+        city,
+        state,
+        zipCode,
+        latitude,
+        longitude,
+        travelRadiusMiles
+      });
+
+      // Generate token
+      const token = generateToken(newUser.userId);
+
+      // Return user without password
+      const { password: userPassword, ...userWithoutPassword } = newUser.toJSON();
+      return {
+        token,
+        user: userWithoutPassword
+      };
     },
 
     login: async (_, { email, password }) => {
-      try {
-        const user = await User.findOne({ where: { email } });
-        if (!user) {
-          throw new Error('Invalid email or password');
-        }
-
-        const isValidPassword = await user.comparePassword(password);
-        if (!isValidPassword) {
-          throw new Error('Invalid email or password');
-        }
-
-        const token = generateToken(user.userId);
-        const { password: userPassword, ...userWithoutPassword } = user.toJSON();
-
-        return {
-          token,
-          user: userWithoutPassword
-        };
-      } catch (error) {
-        console.error('Database error during login:', error.message);
-        
-        // Fallback to sample data when database fails
-        const sampleUser = sampleData.users.find(u => u.email === email);
-        if (!sampleUser) {
-          throw new Error('Invalid email or password');
-        }
-        
-        // In sample data, we'll assume password is correct for demo purposes
-        // In production, you'd verify the password hash
-        
-        // Generate token
-        const token = generateToken(sampleUser.userId);
-        
-        return {
-          token,
-          user: sampleUser
-        };
+      const user = await User.findOne({ where: { email } });
+      if (!user) {
+        throw new Error('Invalid email or password');
       }
+
+      const isValidPassword = await user.comparePassword(password);
+      if (!isValidPassword) {
+        throw new Error('Invalid email or password');
+      }
+
+      const token = generateToken(user.userId);
+      const { password: userPassword, ...userWithoutPassword } = user.toJSON();
+
+      return {
+        token,
+        user: userWithoutPassword
+      };
     },
 
     addGroceryListItem: async (_, { userId, upc, quantity }) => {

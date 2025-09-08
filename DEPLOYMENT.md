@@ -53,7 +53,7 @@ This guide will help you deploy MyGroCart to Render with everything in one place
    - **Publish Directory**: `dist`
 4. Set Environment Variables:
    ```
-   VITE_GRAPHQL_ENDPOINT=https://your-backend-app.onrender.com/graphql
+   VITE_GRAPHQL_ENDPOINT=https://mygrocart.onrender.com/graphql
    ```
 5. Click **"Create Static Site"**
 

@@ -1,7 +1,15 @@
 const { Sequelize } = require('sequelize');
 
-// Simple configuration that works with Render
-const sequelize = new Sequelize(process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart', {
+// Handle DATABASE_URL with SSL parameters
+let databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
+
+// For production, ensure SSL parameters are in the URL
+if (process.env.NODE_ENV === 'production' && !databaseUrl.includes('sslmode')) {
+  const separator = databaseUrl.includes('?') ? '&' : '?';
+  databaseUrl = `${databaseUrl}${separator}sslmode=require`;
+}
+
+const sequelize = new Sequelize(databaseUrl, {
   dialect: 'postgres',
   logging: false,
   dialectOptions: {
@@ -23,6 +31,7 @@ const connectDB = async () => {
     console.log('Attempting to connect to database...');
     console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
     console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+    console.log('Database URL being used:', databaseUrl.replace(/\/\/.*@/, '//***:***@')); // Hide credentials in logs
     
     await sequelize.authenticate();
     console.log('PostgreSQL Connected');
@@ -33,8 +42,8 @@ const connectDB = async () => {
   } catch (error) {
     console.error('Database connection error:', error);
     console.error('Error details:', error.message);
-    console.log('Server will continue without database connection...');
-    console.log('Authentication will use sample data until database is fixed');
+    console.error('Failing to start server due to database connection error');
+    process.exit(1);
   }
 };
 
