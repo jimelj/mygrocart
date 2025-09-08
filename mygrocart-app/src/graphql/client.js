@@ -5,6 +5,9 @@ import { setContext } from '@apollo/client/link/context';
 // Use environment variable for production, relative path for development
 const httpLink = createHttpLink({
   uri: import.meta.env.VITE_GRAPHQL_ENDPOINT || '/graphql',
+  fetchOptions: {
+    mode: 'cors',
+  },
 });
 
 // Create auth link for JWT tokens
