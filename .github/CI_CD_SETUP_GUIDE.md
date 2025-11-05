@@ -7,7 +7,7 @@ Complete guide to setting up Continuous Integration and Continuous Deployment fo
 Your CI/CD pipeline includes:
 
 - **Backend CI/CD**: Automatic testing + deployment to Render
-- **Frontend Web CI/CD**: Automatic testing + deployment to Vercel
+- **Frontend Web CI/CD**: Automatic testing + deployment to Render
 - **Mobile CI**: Automatic testing (deployment is manual via Expo EAS)
 
 ## Quick Start
@@ -29,17 +29,15 @@ Add these secrets:
 
 | Secret Name | Where to Get It | Example Value |
 |-------------|-----------------|---------------|
-| `RENDER_DEPLOY_HOOK_URL` | Render Dashboard → Your Service → Settings → Deploy Hook | `https://api.render.com/deploy/srv-xxx?key=yyy` |
+| `RENDER_DEPLOY_HOOK_URL` | Render Dashboard → Backend Service → Settings → Deploy Hook | `https://api.render.com/deploy/srv-xxx?key=yyy` |
 | `BACKEND_URL` | Your backend URL on Render | `https://mygrocart-backend.onrender.com` |
 
 #### Required for Frontend Web Deployment
 
 | Secret Name | Where to Get It | Example Value |
 |-------------|-----------------|---------------|
-| `VERCEL_TOKEN` | Vercel Dashboard → Settings → Tokens | `v1_xxxx...` |
-| `VERCEL_ORG_ID` | Run `vercel link` in mygrocart-web/ | `team_xxxx` or `user_xxxx` |
-| `VERCEL_PROJECT_ID` | Same as above | `prj_xxxx` |
-| `FRONTEND_URL` | Your frontend URL on Vercel | `https://mygrocart.vercel.app` |
+| `RENDER_FRONTEND_DEPLOY_HOOK_URL` | Render Dashboard → Frontend Service → Settings → Deploy Hook | `https://api.render.com/deploy/srv-zzz?key=www` |
+| `FRONTEND_URL` | Your frontend URL on Render | `https://mygrocart.onrender.com` |
 
 ---
 
@@ -50,10 +48,10 @@ Add these secrets:
 #### Step 1: Get Render Deploy Hook
 
 1. Go to https://dashboard.render.com/
-2. Select your MyGroCart backend service
+2. Select your MyGroCart **backend** service
 3. Click **Settings** → **Deploy Hooks**
 4. Click **Create Deploy Hook**
-5. Name it "GitHub Actions"
+5. Name it "GitHub Actions Backend"
 6. Copy the URL (looks like: `https://api.render.com/deploy/srv-...?key=...`)
 
 #### Step 2: Add to GitHub Secrets
@@ -85,60 +83,25 @@ Watch the GitHub Actions tab - you should see:
 
 ---
 
-### Frontend Web (Vercel)
+### Frontend Web (Render)
 
-#### Step 1: Install Vercel CLI
+#### Step 1: Get Render Deploy Hook
 
-```bash
-pnpm add -g vercel
-```
+1. Go to https://dashboard.render.com/
+2. Select your MyGroCart **frontend** service
+3. Click **Settings** → **Deploy Hooks**
+4. Click **Create Deploy Hook**
+5. Name it "GitHub Actions Frontend"
+6. Copy the URL (looks like: `https://api.render.com/deploy/srv-...?key=...`)
 
-#### Step 2: Link Your Project
+#### Step 2: Add to GitHub Secrets
 
-```bash
-cd mygrocart-web
-vercel link
-```
+Add two secrets:
 
-Follow the prompts:
-- Select your Vercel account
-- Link to existing project or create new one
-- Note the **Project ID** and **Org ID** shown
+1. `RENDER_FRONTEND_DEPLOY_HOOK_URL` - The deploy hook URL from Step 1
+2. `FRONTEND_URL` - Your frontend URL (e.g., `https://mygrocart.onrender.com`)
 
-#### Step 3: Create Vercel Token
-
-1. Go to https://vercel.com/account/tokens
-2. Click **Create Token**
-3. Name it "GitHub Actions"
-4. Set scope to "Full Account"
-5. Click **Create**
-6. Copy the token (starts with `v1_`)
-
-#### Step 4: Find Project and Org IDs
-
-```bash
-cd mygrocart-web
-cat .vercel/project.json
-```
-
-You'll see:
-```json
-{
-  "orgId": "team_xxxx",
-  "projectId": "prj_xxxx"
-}
-```
-
-#### Step 5: Add to GitHub Secrets
-
-Add three secrets:
-
-1. `VERCEL_TOKEN` - The token from Step 3
-2. `VERCEL_ORG_ID` - From project.json
-3. `VERCEL_PROJECT_ID` - From project.json
-4. `FRONTEND_URL` - Your Vercel URL (e.g., `https://mygrocart.vercel.app`)
-
-#### Step 6: Test the Setup
+#### Step 3: Test the Setup
 
 ```bash
 cd mygrocart-web
@@ -151,7 +114,7 @@ Watch for:
 1. ✅ TypeScript & Lint Check
 2. ✅ Build Test
 3. ✅ Accessibility Check
-4. ✅ Deploy to Vercel
+4. ✅ Deploy to Render
 
 ---
 
@@ -273,14 +236,14 @@ Replace `YOUR_USERNAME` with your GitHub username.
 2. Verify environment variables are set on Render
 3. Ensure DATABASE_URL, JWT_SECRET, etc. are configured
 
-### Vercel Deployment Fails
+### Frontend Deployment Fails
 
-**Problem:** "Error: No token specified"
+**Problem:** "Error: Secret RENDER_FRONTEND_DEPLOY_HOOK_URL not found"
 
 **Solution:**
-1. Verify `VERCEL_TOKEN` secret is set
-2. Token must start with `v1_`
-3. Ensure token hasn't expired (tokens don't expire by default)
+1. Verify `RENDER_FRONTEND_DEPLOY_HOOK_URL` secret is set
+2. Check that the URL starts with `https://api.render.com/deploy/`
+3. Ensure it's the frontend service's deploy hook, not the backend's
 
 ### Mobile Tests Fail
 
@@ -337,20 +300,20 @@ Free tier includes:
 
 Your workflows use approximately:
 - Backend: ~3 minutes per run
-- Frontend: ~5 minutes per run
+- Frontend: ~3 minutes per run
 - Mobile: ~4 minutes per run
 
-**Estimate:** ~50 runs/month = ~600 minutes = well within free tier
+**Estimate:** ~50 runs/month = ~500 minutes = well within free tier
 
 ### Third-Party Services
 
 | Service | Cost |
 |---------|------|
 | Render (Backend) | Free tier → $7/month |
-| Vercel (Frontend) | Free |
+| Render (Frontend) | Free tier → $7/month |
 | Expo EAS (Mobile) | Optional, $29/month |
 
-**Total:** $0-$36/month depending on whether you use Expo EAS
+**Total:** $0-$43/month depending on whether you use Expo EAS and Render paid tiers
 
 ---
 
@@ -378,7 +341,7 @@ Your workflows use approximately:
 
 1. **Create a test PR** to verify CI works
 2. **Merge to main** to verify CD works
-3. **Monitor first deployment** in Render/Vercel logs
+3. **Monitor first deployment** in Render logs
 4. **Set up branch protection**:
    - Settings → Branches → Add rule
    - Require status checks to pass before merging
@@ -400,8 +363,6 @@ Your workflows use approximately:
 
 - GitHub Actions Docs: https://docs.github.com/en/actions
 - Render Docs: https://render.com/docs
-- Vercel Docs: https://vercel.com/docs
-- Expo EAS Docs: https://docs.expo.dev/eas/
 
 ### Common Issues
 
@@ -410,7 +371,7 @@ See [Troubleshooting](#troubleshooting) section above.
 ### Getting Help
 
 1. Check workflow logs in GitHub Actions tab
-2. Check deployment service logs (Render/Vercel)
+2. Check deployment service logs (Render)
 3. Review this guide
 4. Search GitHub Actions community forum
 

@@ -170,54 +170,46 @@ jobs:
   # CD: Continuous Deployment (Only runs on main branch after CI passes)
   ##############################################################################
 
-  deploy-to-vercel:
-    name: Deploy to Vercel
+  deploy-to-render:
+    name: Deploy to Render
     needs: [typecheck-and-lint, build-test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Trigger Render deployment
+        run: |
+          curl -X POST "${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10
+      - name: Wait for deployment
+        run: sleep 60
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-          cache-dependency-path: './mygrocart-web/pnpm-lock.yaml'
+      - name: Health check
+        run: |
+          # Try to hit the frontend URL
+          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.FRONTEND_URL }}" || echo "000")
 
-      - name: Install Vercel CLI
-        run: pnpm add -g vercel
-
-      - name: Pull Vercel environment
-        working-directory: ./mygrocart-web
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build project
-        working-directory: ./mygrocart-web
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel
-        working-directory: ./mygrocart-web
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+          if [ "$response" = "200" ] || [ "$response" = "304" ]; then
+            echo "✅ Frontend is responding (HTTP $response)"
+            exit 0
+          else
+            echo "❌ Frontend health check failed (HTTP $response)"
+            exit 1
+          fi
 
   post-deploy-notification:
     name: Post-Deploy Notification
-    needs: [deploy-to-vercel]
+    needs: [deploy-to-render]
     if: always()
     runs-on: ubuntu-latest
 
     steps:
       - name: Send deployment status
         run: |
-          if [ "${{ needs.deploy-to-vercel.result }}" = "success" ]; then
-            echo "✅ Frontend deployed successfully to Vercel"
+          if [ "${{ needs.deploy-to-render.result }}" = "success" ]; then
+            echo "✅ Frontend deployed successfully to Render"
             echo "URL: ${{ secrets.FRONTEND_URL }}"
           else
             echo "❌ Frontend deployment failed"
