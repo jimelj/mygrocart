@@ -82,7 +82,9 @@ async function startServer() {
       ? true // Allow all origins in development (for mobile app testing)
       : [
           'https://mygrocart-frontend.onrender.com',
-          'https://mygrocart.onrender.com'
+          'https://mygrocart.onrender.com',
+          'https://www.mygrocart.com',
+          'https://mygrocart.com'
         ], // Only production domains in production
     credentials: true
   }));
