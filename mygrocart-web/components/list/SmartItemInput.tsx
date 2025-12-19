@@ -204,7 +204,7 @@ export function SmartItemInput({ onAddItem }: SmartItemInputProps) {
         <Button
           onClick={handleAddItem}
           className="w-full"
-          disabled={selectedItem && !selectedVariant}
+          disabled={!!(selectedItem && !selectedVariant)}
         >
           <Plus className="w-4 h-4 mr-2" />
           Add {selectedItem ? `${selectedItem}${selectedVariant && selectedVariant !== 'Any' ? ` (${selectedVariant})` : ''}` : inputValue}
