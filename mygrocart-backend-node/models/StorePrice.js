@@ -8,7 +8,7 @@ const StorePrice = sequelize.define('StorePrice', {
     primaryKey: true
   },
   upc: {
-    type: DataTypes.STRING(12),
+    type: DataTypes.STRING(50), // Updated from 12 to 50 to support pseudo-UPCs (e.g., TGT12955065)
     allowNull: false,
     references: {
       model: 'Products',
@@ -31,8 +31,9 @@ const StorePrice = sequelize.define('StorePrice', {
     }
   },
   dealType: {
-    type: DataTypes.ENUM('regular', 'sale', 'clearance', 'coupon'),
-    defaultValue: 'regular'
+    type: DataTypes.ENUM('regular', 'sale', 'clearance', 'coupon', 'discount'),
+    defaultValue: 'regular',
+    allowNull: true
   },
   lastUpdated: {
     type: DataTypes.DATE,

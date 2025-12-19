@@ -49,7 +49,7 @@ This guide will help you deploy MyGroCart to Render with everything in one place
 3. Configure:
    - **Name**: `mygrocart-frontend`
    - **Root Directory**: `mygrocart-app`
-   - **Build Command**: `npm run build`
+   - **Build Command**: `pnpm install && pnpm run build`
    - **Publish Directory**: `dist`
 4. Set Environment Variables:
    ```

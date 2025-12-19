@@ -5,8 +5,61 @@ const { calculateDistance } = require('../utils/distance');
 const sampleData = require('../utils/sampleData');
 const { Op } = require('sequelize');
 
-// Import Sequelize models for authentication only
+// Import Sequelize models
 const User = require('../models/User');
+const { Product, StorePrice, Store, Flyer, Deal, UserListItem, UserNotification } = require('../models');
+const { enrichWithStoreBrandInfo } = require('../utils/StoreBrandMatcher');
+
+// Import services
+const DynamicPriceDiscoveryService = require('../services/DynamicPriceDiscoveryService');
+const discoveryService = new DynamicPriceDiscoveryService();
+const ProgressiveDiscoveryService = require('../services/ProgressiveDiscoveryService');
+const progressiveDiscoveryService = new ProgressiveDiscoveryService();
+const FlyerService = require('../services/FlyerService');
+
+/**
+ * Check if flyers exist for a ZIP code, and fetch them if not.
+ * Runs in the background (non-blocking) so signup/login stays fast.
+ * @param {string} zipCode - The ZIP code to check
+ */
+async function ensureFlyersForZip(zipCode) {
+  if (!zipCode) return;
+
+  try {
+    // Check if we have any non-expired flyers for this ZIP
+    const existingFlyers = await Flyer.count({
+      where: {
+        zipCode,
+        validTo: { [Op.gte]: new Date() }
+      }
+    });
+
+    if (existingFlyers > 0) {
+      console.log(`[ensureFlyersForZip] ZIP ${zipCode} already has ${existingFlyers} active flyers, skipping fetch`);
+      return;
+    }
+
+    // No flyers for this ZIP - fetch them in the background
+    console.log(`[ensureFlyersForZip] No flyers for ZIP ${zipCode}, triggering background fetch...`);
+
+    const flyerService = new FlyerService();
+
+    // Run in background (don't await) so signup/login returns immediately
+    flyerService.processZipCode(zipCode)
+      .then(result => {
+        console.log(`[ensureFlyersForZip] ZIP ${zipCode} fetch complete:`, {
+          newFlyers: result.newFlyers,
+          totalDeals: result.totalDeals
+        });
+      })
+      .catch(error => {
+        console.error(`[ensureFlyersForZip] ZIP ${zipCode} fetch failed:`, error.message);
+      });
+
+  } catch (error) {
+    console.error(`[ensureFlyersForZip] Error checking flyers for ZIP ${zipCode}:`, error.message);
+  }
+}
 
 // Helper function to generate JWT token
 const generateToken = (userId) => {
@@ -37,12 +90,105 @@ const resolvers = {
       }
     },
 
-    searchProducts: async (_, { query }) => {
-      const searchTerm = query.toLowerCase();
-      return sampleData.products.filter(product => 
-        product.name.toLowerCase().includes(searchTerm) ||
-        (product.brand && product.brand.toLowerCase().includes(searchTerm))
-      );
+    searchProducts: async (_, { query, limit = 20, offset = 0 }, context) => {
+      try {
+        const searchTerm = query.toLowerCase();
+
+        // Get user context for zipCode and radius (if authenticated)
+        let zipCode = '10001'; // Default NYC ZIP
+        let radius = 10; // Default 10 miles
+
+        if (context.user) {
+          try {
+            const user = await User.findByPk(context.user.userId);
+            if (user) {
+              zipCode = user.zipCode;
+              radius = user.travelRadiusMiles;
+              console.log(`[searchProducts] Using user's location: ZIP ${zipCode}, radius ${radius} miles`);
+            }
+          } catch (error) {
+            console.warn('[searchProducts] Could not fetch user location, using defaults:', error.message);
+          }
+        } else {
+          console.log('[searchProducts] No authenticated user, using default location');
+        }
+
+        // Search the Deals table (populated by Weekly Flyer OCR)
+        // The Products table is empty - all data comes from flyer deals
+        console.log('[searchProducts] Searching Deals table for:', searchTerm);
+
+        const { count, rows } = await Deal.findAndCountAll({
+          where: {
+            [Op.and]: [
+              {
+                [Op.or]: [
+                  { productName: { [Op.iLike]: `%${searchTerm}%` } },
+                  { productBrand: { [Op.iLike]: `%${searchTerm}%` } }
+                ]
+              },
+              // Only show currently valid deals
+              { validTo: { [Op.gte]: new Date() } }
+            ]
+          },
+          limit,
+          offset,
+          order: [['productName', 'ASC']]
+        });
+
+        const totalPages = Math.ceil(count / limit);
+        const currentPage = Math.floor(offset / limit) + 1;
+
+        // Transform Deals to Product format for frontend compatibility
+        const products = rows.map(deal => {
+          const plainDeal = deal.get({ plain: true });
+          return {
+            upc: plainDeal.id, // Use deal ID as UPC placeholder
+            name: plainDeal.productName,
+            brand: plainDeal.productBrand || 'Unknown',
+            size: plainDeal.unit || null,
+            category: plainDeal.productCategory || null,
+            imageUrl: plainDeal.imageUrl || null,
+            // Create a storePrices array with the deal's store/price
+            storePrices: [{
+              price: parseFloat(plainDeal.salePrice),
+              regularPrice: plainDeal.regularPrice ? parseFloat(plainDeal.regularPrice) : null,
+              store: {
+                storeId: plainDeal.storeName.toLowerCase().replace(/\s+/g, '-'),
+                chainName: plainDeal.storeName,
+                name: plainDeal.storeName
+              },
+              lastUpdated: plainDeal.updatedAt
+            }],
+            createdAt: plainDeal.createdAt,
+            updatedAt: plainDeal.updatedAt
+          };
+        });
+
+        console.log(`[searchProducts] Found ${count} deals matching "${searchTerm}"`);
+
+        return {
+          products,
+          totalCount: count,
+          hasNextPage: offset + limit < count,
+          hasPreviousPage: offset > 0,
+          currentPage,
+          totalPages,
+          limit
+        };
+      } catch (error) {
+        console.error('[searchProducts] Error:', error);
+        console.error(error.stack);
+        // Return empty results on error instead of crashing
+        return {
+          products: [],
+          totalCount: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+          currentPage: 1,
+          totalPages: 0,
+          limit
+        };
+      }
     },
 
     getProductByUpc: async (_, { upc }) => {
@@ -50,117 +196,279 @@ const resolvers = {
     },
 
     getUserGroceryLists: async (_, { userId }) => {
-      const userItems = sampleData.userLists.filter(item => item.userId === userId);
-      return userItems.map(item => ({
-        ...item,
-        product: sampleData.products.find(p => p.upc === item.upc)
-      }));
+      try {
+        // Query database for user's shopping list items
+        const UserList = require('../models/UserList');
+        const userItems = await UserList.findAll({
+          where: { userId },
+          include: [{ model: Product, as: 'product', required: false }],
+          order: [['createdAt', 'DESC']]
+        });
+
+        // Return database results with plain objects
+        return userItems.map(item => item.get({ plain: true }));
+      } catch (error) {
+        console.error('Error fetching grocery lists from database:', error.message);
+        // Fallback to sample data
+        const userItems = sampleData.userLists.filter(item => item.userId === userId);
+        return userItems.map(item => ({
+          ...item,
+          product: sampleData.products.find(p => p.upc === item.upc)
+        }));
+      }
     },
 
     comparePrices: async (_, { userId }) => {
-      let user;
       try {
-        user = await User.findByPk(userId);
-        if (!user) {
-          // Fallback to sample data if not found in database
-          user = sampleData.users.find(u => u.userId === userId);
-        }
-      } catch (error) {
-        console.log('Database error, using sample data:', error.message);
-        user = sampleData.users.find(u => u.userId === userId);
-      }
-      
-      if (!user) throw new Error('User not found');
+        // 1. Get user from database
+        const user = await User.findByPk(userId);
+        if (!user) throw new Error('User not found');
 
-      let userItems = sampleData.userLists.filter(item => item.userId === userId);
-      
-      // If no items found for this user, create sample items for demonstration
-      if (userItems.length === 0) {
-        userItems = [
-          {
-            listItemId: `demo-item-1-${userId}`,
-            userId: userId,
-            upc: '123456789012', // Organic Bananas
-            quantity: 2,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            listItemId: `demo-item-2-${userId}`,
-            userId: userId,
-            upc: '123456789013', // Whole Milk
-            quantity: 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          },
-          {
-            listItemId: `demo-item-3-${userId}`,
-            userId: userId,
-            upc: '123456789014', // Bread Loaf
-            quantity: 1,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          }
-        ];
-      }
+        // 2. Get user's shopping list items from database
+        const UserList = require('../models/UserList');
+        const userItems = await UserList.findAll({
+          where: { userId },
+          include: [{ model: Product, as: 'product' }]
+        });
 
-      // Get nearby stores
-      const nearbyStores = sampleData.stores.filter(store => {
-        const distance = calculateDistance(
-          user.latitude, user.longitude,
-          store.latitude, store.longitude
-        );
-        return distance <= user.travelRadiusMiles;
-      });
-
-      // Calculate total cost per store
-      const storeComparisons = [];
-      let minTotal = Infinity;
-
-      for (const store of nearbyStores) {
-        let totalCost = 0;
-        let itemsFound = 0;
-
-        for (const item of userItems) {
-          const priceRecord = sampleData.storePrices.find(
-            price => price.upc === item.upc && price.storeId === store.storeId
-          );
-
-          if (priceRecord) {
-            totalCost += priceRecord.price * item.quantity;
-            itemsFound++;
-          }
+        if (userItems.length === 0) {
+          // Return empty comparison if no items in list
+          return {
+            userId,
+            stores: [],
+            cheapestStore: null,
+            maxSavings: 0,
+            message: 'No items in shopping list'
+          };
         }
 
-        if (itemsFound > 0) {
+        const totalItems = userItems.length;
+
+        // 3. Get all stores from database
+        const allStores = await Store.findAll();
+
+        // 4. Filter stores within travel radius
+        const nearbyStores = allStores.filter(store => {
           const distance = calculateDistance(
             user.latitude, user.longitude,
             store.latitude, store.longitude
           );
+          return distance <= user.travelRadiusMiles;
+        });
 
-          storeComparisons.push({
-            store,
-            totalCost,
-            distance,
-            itemsFound
-          });
-
-          minTotal = Math.min(minTotal, totalCost);
+        if (nearbyStores.length === 0) {
+          // No stores in range
+          return {
+            userId,
+            stores: [],
+            cheapestStore: null,
+            maxSavings: 0,
+            message: 'No stores within travel radius'
+          };
         }
-      }
 
-      // Calculate savings and mark cheapest
-      const maxTotal = Math.max(...storeComparisons.map(comp => comp.totalCost));
-      
-      return storeComparisons
-        .map(comparison => ({
-          store: comparison.store,
-          totalCost: comparison.totalCost,
-          savings: maxTotal - comparison.totalCost,
-          distance: comparison.distance,
-          isCheapest: comparison.totalCost === minTotal
-        }))
-        .sort((a, b) => a.totalCost - b.totalCost);
+        // 5. Get UPCs from shopping list
+        const upcsInList = userItems.map(item => item.upc);
+
+        // 6. Get all prices for these products at nearby stores
+        const storePrices = await StorePrice.findAll({
+          where: {
+            upc: upcsInList,
+            storeId: nearbyStores.map(s => s.storeId)
+          },
+          include: [
+            { model: Product, as: 'product' },
+            { model: Store, as: 'store' }
+          ]
+        });
+
+        // 7. Calculate total cost per store
+        const storeComparisons = [];
+        let minTotal = Infinity;
+
+        for (const store of nearbyStores) {
+          let totalCost = 0;
+          let itemCount = 0;
+          const missingItems = [];
+
+          for (const item of userItems) {
+            const priceRecord = storePrices.find(
+              price => price.upc === item.upc && price.storeId === store.storeId
+            );
+
+            if (priceRecord) {
+              totalCost += parseFloat(priceRecord.price) * item.quantity;
+              itemCount++;
+            } else {
+              // Track missing items
+              missingItems.push({
+                name: item.product ? item.product.name : 'Unknown Product',
+                upc: item.upc,
+                quantity: item.quantity
+              });
+            }
+          }
+
+          // Only include stores that have at least one item in stock
+          if (itemCount > 0) {
+            const completionPercentage = (itemCount / totalItems) * 100;
+
+            storeComparisons.push({
+              store: store.get({ plain: true }),
+              totalCost: parseFloat(totalCost.toFixed(2)),
+              itemCount,
+              totalItems,
+              completionPercentage: parseFloat(completionPercentage.toFixed(2)),
+              missingItems
+            });
+
+            minTotal = Math.min(minTotal, totalCost);
+          }
+        }
+
+        if (storeComparisons.length === 0) {
+          // No stores have pricing for any items
+          return {
+            userId,
+            stores: [],
+            cheapestStore: null,
+            maxSavings: 0,
+            message: 'No pricing data available for your items'
+          };
+        }
+
+        // 8. Calculate savings and mark cheapest
+        const maxTotal = Math.max(...storeComparisons.map(comp => comp.totalCost));
+
+        const stores = storeComparisons
+          .map(comparison => {
+            const savings = maxTotal - comparison.totalCost;
+            const savingsPercentage = maxTotal > 0 ? (savings / maxTotal) * 100 : 0;
+
+            return {
+              store: comparison.store,
+              totalCost: comparison.totalCost,
+              itemCount: comparison.itemCount,
+              totalItems: comparison.totalItems,
+              completionPercentage: comparison.completionPercentage,
+              missingItems: comparison.missingItems,
+              isCheapest: comparison.totalCost === minTotal,
+              savings: parseFloat(savings.toFixed(2)),
+              savingsPercentage: parseFloat(savingsPercentage.toFixed(2))
+            };
+          })
+          .sort((a, b) => a.totalCost - b.totalCost);
+
+        // Find cheapest store
+        const cheapestStore = stores.find(s => s.isCheapest);
+
+        return {
+          userId,
+          stores,
+          cheapestStore: cheapestStore ? cheapestStore.store.storeName : null,
+          maxSavings: parseFloat((maxTotal - minTotal).toFixed(2)),
+          message: `Found ${stores.length} stores with pricing for your items`
+        };
+
+      } catch (error) {
+        console.error('Error in comparePrices:', error.message);
+        console.error(error.stack);
+
+        // Fallback to sample data if database fails
+        let user;
+        try {
+          user = await User.findByPk(userId);
+          if (!user) {
+            user = sampleData.users.find(u => u.userId === userId);
+          }
+        } catch (error) {
+          user = sampleData.users.find(u => u.userId === userId);
+        }
+
+        if (!user) throw new Error('User not found');
+
+        let userItems = sampleData.userLists.filter(item => item.userId === userId);
+
+        if (userItems.length === 0) {
+          userItems = [
+            { listItemId: `demo-item-1-${userId}`, userId, upc: '123456789012', quantity: 2, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+            { listItemId: `demo-item-2-${userId}`, userId, upc: '123456789013', quantity: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+            { listItemId: `demo-item-3-${userId}`, userId, upc: '123456789014', quantity: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+          ];
+        }
+
+        const totalItems = userItems.length;
+        const nearbyStores = sampleData.stores.filter(store => {
+          const distance = calculateDistance(user.latitude, user.longitude, store.latitude, store.longitude);
+          return distance <= user.travelRadiusMiles;
+        });
+
+        const storeComparisons = [];
+        let minTotal = Infinity;
+
+        for (const store of nearbyStores) {
+          let totalCost = 0;
+          let itemCount = 0;
+          const missingItems = [];
+
+          for (const item of userItems) {
+            const priceRecord = sampleData.storePrices.find(price => price.upc === item.upc && price.storeId === store.storeId);
+            if (priceRecord) {
+              totalCost += priceRecord.price * item.quantity;
+              itemCount++;
+            } else {
+              const product = sampleData.products.find(p => p.upc === item.upc);
+              missingItems.push({
+                name: product ? product.name : 'Unknown Product',
+                upc: item.upc,
+                quantity: item.quantity
+              });
+            }
+          }
+
+          if (itemCount > 0) {
+            const distance = calculateDistance(user.latitude, user.longitude, store.latitude, store.longitude);
+            const completionPercentage = (itemCount / totalItems) * 100;
+            storeComparisons.push({
+              store,
+              totalCost,
+              itemCount,
+              totalItems,
+              completionPercentage: parseFloat(completionPercentage.toFixed(2)),
+              missingItems
+            });
+            minTotal = Math.min(minTotal, totalCost);
+          }
+        }
+
+        const maxTotal = Math.max(...storeComparisons.map(comp => comp.totalCost));
+        const stores = storeComparisons
+          .map(comparison => {
+            const savings = maxTotal - comparison.totalCost;
+            const savingsPercentage = maxTotal > 0 ? (savings / maxTotal) * 100 : 0;
+            return {
+              store: comparison.store,
+              totalCost: comparison.totalCost,
+              itemCount: comparison.itemCount,
+              totalItems: comparison.totalItems,
+              completionPercentage: comparison.completionPercentage,
+              missingItems: comparison.missingItems,
+              isCheapest: comparison.totalCost === minTotal,
+              savings: parseFloat(savings.toFixed(2)),
+              savingsPercentage: parseFloat(savingsPercentage.toFixed(2))
+            };
+          })
+          .sort((a, b) => a.totalCost - b.totalCost);
+
+        const cheapestStore = stores.find(s => s.isCheapest);
+        return {
+          userId,
+          stores,
+          cheapestStore: cheapestStore ? cheapestStore.store.storeName : null,
+          maxSavings: parseFloat((maxTotal - minTotal).toFixed(2)),
+          message: `Found ${stores.length} stores (using sample data)`
+        };
+      }
     },
 
     getStorePrices: async (_, { storeId, upcs }) => {
@@ -171,6 +479,426 @@ const resolvers = {
           product: sampleData.products.find(p => p.upc === price.upc),
           store: sampleData.stores.find(s => s.storeId === price.storeId)
         }));
+    },
+
+    // ===================================================================
+    // NEW FLYER-BASED QUERIES
+    // ===================================================================
+
+    getDealsNearMe: async (_, { zipCode, radiusMiles = 10, category, limit = 20, offset = 0 }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const where = {
+          zipCode,
+          validTo: { [Op.gte]: new Date() }
+        };
+
+        if (category) {
+          where.productCategory = category;
+        }
+
+        // Cap limit at 100 to prevent excessive queries
+        const cappedLimit = Math.min(limit, 100);
+
+        const { count, rows } = await Deal.findAndCountAll({
+          where,
+          include: [
+            {
+              model: Flyer,
+              as: 'flyer',
+              include: [{ model: Store, as: 'store', required: false }]
+            }
+          ],
+          order: [['salePrice', 'ASC']],
+          limit: cappedLimit,
+          offset
+        });
+
+        const totalPages = Math.ceil(count / cappedLimit);
+        const currentPage = Math.floor(offset / cappedLimit) + 1;
+
+        // Transform dealType to uppercase to match GraphQL enum
+        const dealTypeMap = {
+          'sale': 'SALE',
+          'bogo': 'BOGO',
+          'multi_buy': 'MULTI_BUY',
+          'coupon': 'COUPON',
+          'clearance': 'CLEARANCE'
+        };
+
+        const deals = rows.map(deal => {
+          const plainDeal = deal.get({ plain: true });
+          return {
+            ...plainDeal,
+            dealType: dealTypeMap[plainDeal.dealType?.toLowerCase()] || 'SALE',
+            // Ensure dates are ISO strings for GraphQL
+            validFrom: plainDeal.validFrom ? new Date(plainDeal.validFrom).toISOString() : null,
+            validTo: plainDeal.validTo ? new Date(plainDeal.validTo).toISOString() : null,
+            savings: plainDeal.regularPrice
+              ? parseFloat((plainDeal.regularPrice - plainDeal.salePrice).toFixed(2))
+              : null,
+            savingsPercent: plainDeal.regularPrice
+              ? parseFloat((((plainDeal.regularPrice - plainDeal.salePrice) / plainDeal.regularPrice) * 100).toFixed(0))
+              : null
+          };
+        });
+
+        return {
+          deals,
+          totalCount: count,
+          hasNextPage: offset + rows.length < count,
+          hasPreviousPage: offset > 0,
+          currentPage,
+          totalPages
+        };
+      } catch (error) {
+        console.error('[getDealsNearMe] Error:', error.message);
+        throw new Error('Failed to fetch deals');
+      }
+    },
+
+    getDealsForStore: async (_, { storeId, category, limit = 20, offset = 0 }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const where = {
+          validTo: { [Op.gte]: new Date() }
+        };
+
+        if (category) {
+          where.productCategory = category;
+        }
+
+        // Cap limit at 100 to prevent excessive queries
+        const cappedLimit = Math.min(limit, 100);
+
+        const { count, rows } = await Deal.findAndCountAll({
+          include: [
+            {
+              model: Flyer,
+              as: 'flyer',
+              where: { storeId },
+              include: [{ model: Store, as: 'store' }]
+            }
+          ],
+          where,
+          order: [['salePrice', 'ASC']],
+          limit: cappedLimit,
+          offset
+        });
+
+        const totalPages = Math.ceil(count / cappedLimit);
+        const currentPage = Math.floor(offset / cappedLimit) + 1;
+
+        const dealTypeMap = {
+          'sale': 'SALE',
+          'bogo': 'BOGO',
+          'multi_buy': 'MULTI_BUY',
+          'coupon': 'COUPON',
+          'clearance': 'CLEARANCE'
+        };
+
+        const deals = rows.map(deal => {
+          const plainDeal = deal.get({ plain: true });
+          return {
+            ...plainDeal,
+            dealType: dealTypeMap[plainDeal.dealType?.toLowerCase()] || 'SALE',
+            validFrom: plainDeal.validFrom ? new Date(plainDeal.validFrom).toISOString() : null,
+            validTo: plainDeal.validTo ? new Date(plainDeal.validTo).toISOString() : null,
+            savings: plainDeal.regularPrice
+              ? parseFloat((plainDeal.regularPrice - plainDeal.salePrice).toFixed(2))
+              : null,
+            savingsPercent: plainDeal.regularPrice
+              ? parseFloat((((plainDeal.regularPrice - plainDeal.salePrice) / plainDeal.regularPrice) * 100).toFixed(0))
+              : null
+          };
+        });
+
+        return {
+          deals,
+          totalCount: count,
+          hasNextPage: offset + rows.length < count,
+          hasPreviousPage: offset > 0,
+          currentPage,
+          totalPages
+        };
+      } catch (error) {
+        console.error('[getDealsForStore] Error:', error.message, error.stack);
+        throw new Error('Failed to fetch deals for store');
+      }
+    },
+
+    searchDeals: async (_, { query, zipCode, limit = 20, offset = 0 }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const searchTerm = query.toLowerCase();
+
+        // Cap limit at 100 to prevent excessive queries
+        const cappedLimit = Math.min(limit, 100);
+
+        const { count, rows } = await Deal.findAndCountAll({
+          where: {
+            zipCode,
+            productName: { [Op.iLike]: `%${searchTerm}%` },
+            validTo: { [Op.gte]: new Date() }
+          },
+          include: [
+            {
+              model: Flyer,
+              as: 'flyer',
+              include: [{ model: Store, as: 'store', required: false }]
+            }
+          ],
+          order: [['salePrice', 'ASC']],
+          limit: cappedLimit,
+          offset
+        });
+
+        const totalPages = Math.ceil(count / cappedLimit);
+        const currentPage = Math.floor(offset / cappedLimit) + 1;
+
+        const dealTypeMap = {
+          'sale': 'SALE',
+          'bogo': 'BOGO',
+          'multi_buy': 'MULTI_BUY',
+          'coupon': 'COUPON',
+          'clearance': 'CLEARANCE'
+        };
+
+        const deals = rows.map(deal => {
+          const plainDeal = deal.get({ plain: true });
+          return {
+            ...plainDeal,
+            dealType: dealTypeMap[plainDeal.dealType?.toLowerCase()] || 'SALE',
+            validFrom: plainDeal.validFrom ? new Date(plainDeal.validFrom).toISOString() : null,
+            validTo: plainDeal.validTo ? new Date(plainDeal.validTo).toISOString() : null,
+            savings: plainDeal.regularPrice
+              ? parseFloat((plainDeal.regularPrice - plainDeal.salePrice).toFixed(2))
+              : null,
+            savingsPercent: plainDeal.regularPrice
+              ? parseFloat((((plainDeal.regularPrice - plainDeal.salePrice) / plainDeal.regularPrice) * 100).toFixed(0))
+              : null
+          };
+        });
+
+        return {
+          deals,
+          totalCount: count,
+          hasNextPage: offset + rows.length < count,
+          hasPreviousPage: offset > 0,
+          currentPage,
+          totalPages
+        };
+      } catch (error) {
+        console.error('[searchDeals] Error:', error.message, error.stack);
+        throw new Error('Failed to search deals');
+      }
+    },
+
+    getFlyer: async (_, { flyerId }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const flyer = await Flyer.findByPk(flyerId, {
+          include: [
+            { model: Store, as: 'store', required: false },
+            {
+              model: Deal,
+              as: 'deals',
+              where: { validTo: { [Op.gte]: new Date() } },
+              required: false
+            }
+          ]
+        });
+
+        return flyer ? flyer.get({ plain: true }) : null;
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[getFlyer] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        return null;
+      }
+    },
+
+    getCurrentFlyers: async (_, { zipCode, radiusMiles = 10 }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const flyers = await Flyer.findAll({
+          where: {
+            zipCode,
+            validTo: { [Op.gte]: new Date() },
+            status: 'completed'
+          },
+          include: [
+            { model: Store, as: 'store', required: false },
+            {
+              model: Deal,
+              as: 'deals',
+              required: false
+            }
+          ],
+          order: [['validFrom', 'DESC']]
+        });
+
+        // Transform status to uppercase for GraphQL enum
+        const statusMap = {
+          'pending': 'PENDING',
+          'processing': 'PROCESSING',
+          'completed': 'COMPLETED',
+          'failed': 'FAILED'
+        };
+
+        return flyers.map(flyer => {
+          const plainFlyer = flyer.get({ plain: true });
+          return {
+            ...plainFlyer,
+            status: statusMap[plainFlyer.status?.toLowerCase()] || 'COMPLETED'
+          };
+        });
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[getCurrentFlyers] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        return [];
+      }
+    },
+
+    getMyListWithDeals: async (_, { userId }, { user }) => {
+      try {
+        if (!user || user.userId !== userId) {
+          throw new Error('Unauthorized');
+        }
+
+        const listItems = await UserListItem.findAll({
+          where: { userId, checked: false },
+          include: [{ model: User, as: 'user' }],
+          order: [['createdAt', 'ASC']]
+        });
+
+        return listItems.map(item => item.get({ plain: true }));
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[getMyListWithDeals] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        return [];
+      }
+    },
+
+    matchDealsToMyList: async (_, { userId }, { user }) => {
+      try {
+        if (!user || user.userId !== userId) {
+          throw new Error('Unauthorized');
+        }
+
+        const dbUser = await User.findByPk(userId);
+        if (!dbUser) {
+          throw new Error('User not found');
+        }
+
+        const listItems = await UserListItem.findAll({
+          where: { userId, checked: false }
+        });
+
+        if (listItems.length === 0) {
+          return [];
+        }
+
+        const deals = await Deal.findAll({
+          where: {
+            zipCode: dbUser.zipCode,
+            validTo: { [Op.gte]: new Date() }
+          },
+          include: [
+            {
+              model: Flyer,
+              as: 'flyer',
+              include: [{ model: Store, as: 'store', required: false }]
+            }
+          ]
+        });
+
+        const matches = [];
+
+        for (const item of listItems) {
+          const itemPlain = item.get({ plain: true });
+
+          for (const deal of deals) {
+            const dealPlain = deal.get({ plain: true });
+            const dealText = dealPlain.productName.toLowerCase();
+            const itemName = itemPlain.itemName.toLowerCase();
+            const variant = itemPlain.itemVariant?.toLowerCase();
+
+            if (!dealText.includes(itemName)) continue;
+            if (variant && !dealText.includes(variant)) continue;
+
+            const score = variant && dealText.includes(variant) ? 1.0 : 0.5;
+
+            matches.push({
+              deal: {
+                ...dealPlain,
+                savings: dealPlain.regularPrice
+                  ? parseFloat((dealPlain.regularPrice - dealPlain.salePrice).toFixed(2))
+                  : null,
+                savingsPercent: dealPlain.regularPrice
+                  ? parseFloat((((dealPlain.regularPrice - dealPlain.salePrice) / dealPlain.regularPrice) * 100).toFixed(0))
+                  : null
+              },
+              listItem: itemPlain,
+              matchScore: score,
+              matchReason: variant
+                ? `Matches "${itemName}" + "${variant}"`
+                : `Matches "${itemName}"`
+            });
+          }
+        }
+
+        return matches.sort((a, b) => b.matchScore - a.matchScore);
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[matchDealsToMyList] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        return [];
+      }
+    },
+
+    getMyNotifications: async (_, { userId, limit = 20 }, { user }) => {
+      try {
+        if (!user || user.userId !== userId) {
+          throw new Error('Unauthorized');
+        }
+
+        const notifications = await UserNotification.findAll({
+          where: { userId },
+          include: [{ model: User, as: 'user' }],
+          order: [['sentAt', 'DESC']],
+          limit
+        });
+
+        return notifications.map(notif => notif.get({ plain: true }));
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[getMyNotifications] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        return [];
+      }
     }
   },
 
@@ -201,6 +929,9 @@ const resolvers = {
 
         // Generate token
         const token = generateToken(newUser.userId);
+
+        // Trigger flyer fetch for this ZIP code if none exist (runs in background)
+        ensureFlyersForZip(zipCode);
 
         // Return user without password
         const { password: userPassword, ...userWithoutPassword } = newUser.toJSON();
@@ -239,6 +970,10 @@ const resolvers = {
       }
 
       const token = generateToken(user.userId);
+
+      // Trigger flyer fetch for this ZIP code if none exist (runs in background)
+      ensureFlyersForZip(user.zipCode);
+
       const { password: userPassword, ...userWithoutPassword } = user.toJSON();
 
       return {
@@ -247,75 +982,179 @@ const resolvers = {
       };
     },
 
-    addGroceryListItem: async (_, { userId, upc, quantity }) => {
-      // Check if item already exists
-      const existingItemIndex = sampleData.userLists.findIndex(
-        item => item.userId === userId && item.upc === upc
-      );
-
-      let listItem;
-
-      if (existingItemIndex !== -1) {
-        // Update existing item
-        sampleData.userLists[existingItemIndex].quantity += quantity;
-        sampleData.userLists[existingItemIndex].updatedAt = new Date().toISOString();
-        listItem = sampleData.userLists[existingItemIndex];
-      } else {
-        // Create new item
-        listItem = {
-          listItemId: uuidv4(),
-          userId,
-          upc,
-          quantity,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        sampleData.userLists.push(listItem);
+    updateTravelRadius: async (_, { travelRadiusMiles }, context) => {
+      if (!context.user) {
+        throw new Error('Authentication required');
       }
 
-      return {
-        ...listItem,
-        product: sampleData.products.find(p => p.upc === listItem.upc)
-      };
+      // Validate radius is between 5 and 15 miles
+      if (travelRadiusMiles < 5 || travelRadiusMiles > 15) {
+        throw new Error('Travel radius must be between 5 and 15 miles');
+      }
+
+      const user = await User.findOne({ where: { userId: context.user.userId } });
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      user.travelRadiusMiles = travelRadiusMiles;
+      await user.save();
+
+      const { password, ...userWithoutPassword } = user.toJSON();
+      return userWithoutPassword;
+    },
+
+    addGroceryListItem: async (_, { userId, upc, quantity }) => {
+      try {
+        const UserList = require('../models/UserList');
+
+        // Check if item already exists in database
+        const existingItem = await UserList.findOne({
+          where: { userId, upc },
+          include: [{ model: Product, as: 'product' }]
+        });
+
+        let listItem;
+
+        if (existingItem) {
+          // Update existing item quantity
+          existingItem.quantity += quantity;
+          await existingItem.save();
+          listItem = existingItem;
+        } else {
+          // Create new item in database
+          listItem = await UserList.create({
+            userId,
+            upc,
+            quantity
+          });
+
+          // Fetch with product relation
+          listItem = await UserList.findOne({
+            where: { listItemId: listItem.listItemId },
+            include: [{ model: Product, as: 'product' }]
+          });
+        }
+
+        // Return plain object
+        return listItem.get({ plain: true });
+      } catch (error) {
+        console.error('Error adding grocery list item to database:', error.message);
+
+        // Fallback to sample data if database fails
+        const existingItemIndex = sampleData.userLists.findIndex(
+          item => item.userId === userId && item.upc === upc
+        );
+
+        let listItem;
+
+        if (existingItemIndex !== -1) {
+          sampleData.userLists[existingItemIndex].quantity += quantity;
+          sampleData.userLists[existingItemIndex].updatedAt = new Date().toISOString();
+          listItem = sampleData.userLists[existingItemIndex];
+        } else {
+          listItem = {
+            listItemId: uuidv4(),
+            userId,
+            upc,
+            quantity,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          sampleData.userLists.push(listItem);
+        }
+
+        return {
+          ...listItem,
+          product: sampleData.products.find(p => p.upc === listItem.upc)
+        };
+      }
     },
 
     updateGroceryListItem: async (_, { listItemId, quantity }) => {
-      const itemIndex = sampleData.userLists.findIndex(
-        item => item.listItemId === listItemId
-      );
+      try {
+        const UserList = require('../models/UserList');
 
-      if (itemIndex === -1) {
-        throw new Error('List item not found');
+        // Find item in database
+        const listItem = await UserList.findOne({
+          where: { listItemId },
+          include: [{ model: Product, as: 'product' }]
+        });
+
+        if (!listItem) {
+          throw new Error('List item not found');
+        }
+
+        if (quantity <= 0) {
+          // Remove item if quantity is 0 or negative
+          await listItem.destroy();
+          return null;
+        }
+
+        // Update quantity
+        listItem.quantity = quantity;
+        await listItem.save();
+
+        return listItem.get({ plain: true });
+      } catch (error) {
+        console.error('Error updating grocery list item in database:', error.message);
+
+        // Fallback to sample data
+        const itemIndex = sampleData.userLists.findIndex(
+          item => item.listItemId === listItemId
+        );
+
+        if (itemIndex === -1) {
+          throw new Error('List item not found');
+        }
+
+        if (quantity <= 0) {
+          sampleData.userLists.splice(itemIndex, 1);
+          return null;
+        }
+
+        sampleData.userLists[itemIndex].quantity = quantity;
+        sampleData.userLists[itemIndex].updatedAt = new Date().toISOString();
+
+        const updatedItem = sampleData.userLists[itemIndex];
+        return {
+          ...updatedItem,
+          product: sampleData.products.find(p => p.upc === updatedItem.upc)
+        };
       }
-
-      if (quantity <= 0) {
-        // Remove item if quantity is 0 or negative
-        sampleData.userLists.splice(itemIndex, 1);
-        return null;
-      }
-
-      // Update quantity
-      sampleData.userLists[itemIndex].quantity = quantity;
-      sampleData.userLists[itemIndex].updatedAt = new Date().toISOString();
-
-      const updatedItem = sampleData.userLists[itemIndex];
-      return {
-        ...updatedItem,
-        product: sampleData.products.find(p => p.upc === updatedItem.upc)
-      };
     },
 
     removeGroceryListItem: async (_, { listItemId }) => {
-      const itemIndex = sampleData.userLists.findIndex(
-        item => item.listItemId === listItemId
-      );
+      try {
+        const UserList = require('../models/UserList');
 
-      if (itemIndex === -1) {
-        return false;
+        // Find item in database
+        const listItem = await UserList.findOne({
+          where: { listItemId }
+        });
+
+        if (!listItem) {
+          return false;
+        }
+
+        // Delete from database
+        await listItem.destroy();
+        return true;
+      } catch (error) {
+        console.error('Error removing grocery list item from database:', error.message);
+
+        // Fallback to sample data
+        const itemIndex = sampleData.userLists.findIndex(
+          item => item.listItemId === listItemId
+        );
+
+        if (itemIndex === -1) {
+          return false;
+        }
+
+        sampleData.userLists.splice(itemIndex, 1);
+        return true;
       }
-
-      sampleData.userLists.splice(itemIndex, 1);
-      return true;
     },
 
     updateProductPrice: async (_, { upc, storeId, price, dealType = 'regular' }) => {
@@ -352,6 +1191,184 @@ const resolvers = {
         product: sampleData.products.find(p => p.upc === priceRecord.upc),
         store: sampleData.stores.find(s => s.storeId === priceRecord.storeId)
       };
+    },
+
+    // Price Discovery mutation (DEPRECATED)
+    discoverPrices: async (_, { userId, radiusMiles = 10, maxStores = 5, priorityChain = null }) => {
+      try {
+        console.log(`Discovering prices for user ${userId}...`);
+
+        // Get user location
+        const user = await User.findByPk(userId);
+        if (!user) {
+          return {
+            success: false,
+            message: 'User not found',
+            jobId: '',
+            discoveryNeeds: null,
+            summary: null
+          };
+        }
+
+        // Trigger price discovery
+        const result = await discoveryService.discoverPricesForUserLocation(userId, {
+          userLat: user.latitude,
+          userLon: user.longitude,
+          radiusMiles,
+          maxStores,
+          priorityChain
+        });
+
+        return result;
+      } catch (error) {
+        console.error('Error in discoverPrices mutation:', error.message);
+        return {
+          success: false,
+          message: error.message,
+          jobId: '',
+          discoveryNeeds: null,
+          summary: null
+        };
+      }
+    },
+
+    // ===================================================================
+    // NEW FLYER-BASED MUTATIONS
+    // ===================================================================
+
+    addListItem: async (_, { itemName, itemVariant, category, quantity = 1 }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const listItem = await UserListItem.create({
+          userId: user.userId,
+          itemName,
+          itemVariant: itemVariant || null,
+          category: category || null,
+          quantity,
+          checked: false
+        });
+
+        const createdItem = await UserListItem.findByPk(listItem.id, {
+          include: [{ model: User, as: 'user' }]
+        });
+
+        return createdItem.get({ plain: true });
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[addListItem] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        throw new Error('Failed to add item to your list. Please try again.');
+      }
+    },
+
+    updateListItem: async (_, { id, quantity, checked }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const [rowsUpdated, [updatedItem]] = await UserListItem.update(
+          {
+            ...(quantity !== undefined && quantity !== null && { quantity }),
+            ...(checked !== undefined && checked !== null && { checked })
+          },
+          {
+            where: { id, userId: user.userId },
+            returning: true
+          }
+        );
+
+        if (rowsUpdated === 0) {
+          throw new Error('List item not found or unauthorized');
+        }
+
+        return updatedItem.get({ plain: true });
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[updateListItem] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        throw new Error('Failed to update item in your list. Please try again.');
+      }
+    },
+
+    removeListItem: async (_, { id }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const listItem = await UserListItem.findOne({
+          where: { id, userId: user.userId }
+        });
+
+        if (!listItem) {
+          return false;
+        }
+
+        await listItem.destroy();
+        return true;
+      } catch (error) {
+        console.error('[removeListItem] Error:', error.message);
+        return false;
+      }
+    },
+
+    markNotificationRead: async (_, { notificationId }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const notification = await UserNotification.findOne({
+          where: { id: notificationId, userId: user.userId }
+        });
+
+        if (!notification) {
+          throw new Error('Notification not found or unauthorized');
+        }
+
+        notification.readAt = new Date();
+        await notification.save();
+
+        const updatedNotification = await UserNotification.findByPk(notificationId, {
+          include: [{ model: User, as: 'user' }]
+        });
+
+        return updatedNotification.get({ plain: true });
+      } catch (error) {
+        // Log detailed error internally
+        console.error('[markNotificationRead] Error:', error.message, error.stack);
+
+        // Return generic error to client
+        throw new Error('Failed to mark notification as read. Please try again.');
+      }
+    }
+  },
+
+  // Field resolvers
+  Product: {
+    storePrices: async (parent) => {
+      // If storePrices already loaded (from eager loading), return them
+      if (parent.storePrices !== undefined) {
+        return parent.storePrices;
+      }
+
+      // Otherwise, query for them
+      try {
+        const prices = await StorePrice.findAll({
+          where: { upc: parent.upc },
+          include: [{ model: Store, as: 'store' }]
+        });
+        return prices.map(p => p.get({ plain: true }));
+      } catch (error) {
+        console.error(`Error fetching storePrices for ${parent.upc}:`, error.message);
+        return [];
+      }
     }
   }
 };

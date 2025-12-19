@@ -9,6 +9,16 @@ const User = sequelize.define('User', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
+  // Virtual field to alias userId as 'id' for frontend compatibility
+  id: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.getDataValue('userId');
+    },
+    set(value) {
+      throw new Error('Do not try to set the `id` value! Use `userId` instead.');
+    }
+  },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -27,17 +37,21 @@ const User = sequelize.define('User', {
       }
     }
   },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   address: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   city: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   state: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   zipCode: {
     type: DataTypes.STRING,
@@ -45,16 +59,20 @@ const User = sequelize.define('User', {
   },
   latitude: {
     type: DataTypes.DECIMAL(10, 8),
-    allowNull: false
+    allowNull: true
   },
   longitude: {
     type: DataTypes.DECIMAL(11, 8),
-    allowNull: false
+    allowNull: true
   },
   travelRadiusMiles: {
     type: DataTypes.INTEGER,
     allowNull: false,
     defaultValue: 10
+  },
+  isAdmin: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 }, {
   timestamps: true,

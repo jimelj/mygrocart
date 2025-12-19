@@ -38,6 +38,11 @@ const Store = sequelize.define('Store', {
   longitude: {
     type: DataTypes.DECIMAL(11, 8),
     allowNull: true
+  },
+  externalStoreId: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: "Store chain's internal ID (e.g., Target: '2055', ShopRite: '3000')"
   }
 }, {
   timestamps: true,

@@ -86,40 +86,24 @@ const sampleData = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     },
-    {
-      storeId: 'store-3',
-      chainName: 'Acme',
-      storeName: 'Acme Markets',
-      address: '789 Park Ave',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10003',
-      latitude: 40.7831,
-      longitude: -73.9712,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
+    // Removed ACME test data (not a supported store yet)
   ],
   storePrices: [
     // Organic Bananas
     { priceId: 'price-1', upc: '123456789012', storeId: 'store-1', price: 2.99, dealType: 'regular', lastUpdated: new Date().toISOString() },
     { priceId: 'price-2', upc: '123456789012', storeId: 'store-2', price: 3.29, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    { priceId: 'price-3', upc: '123456789012', storeId: 'store-3', price: 3.49, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    
+
     // Whole Milk
     { priceId: 'price-4', upc: '123456789013', storeId: 'store-1', price: 3.49, dealType: 'regular', lastUpdated: new Date().toISOString() },
     { priceId: 'price-5', upc: '123456789013', storeId: 'store-2', price: 3.79, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    { priceId: 'price-6', upc: '123456789013', storeId: 'store-3', price: 3.99, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    
+
     // Bread Loaf
     { priceId: 'price-7', upc: '123456789014', storeId: 'store-1', price: 2.79, dealType: 'regular', lastUpdated: new Date().toISOString() },
     { priceId: 'price-8', upc: '123456789014', storeId: 'store-2', price: 2.99, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    { priceId: 'price-9', upc: '123456789014', storeId: 'store-3', price: 3.19, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    
+
     // Ground Beef
     { priceId: 'price-10', upc: '123456789015', storeId: 'store-1', price: 6.99, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    { priceId: 'price-11', upc: '123456789015', storeId: 'store-2', price: 7.49, dealType: 'regular', lastUpdated: new Date().toISOString() },
-    { priceId: 'price-12', upc: '123456789015', storeId: 'store-3', price: 7.99, dealType: 'regular', lastUpdated: new Date().toISOString() }
+    { priceId: 'price-11', upc: '123456789015', storeId: 'store-2', price: 7.49, dealType: 'regular', lastUpdated: new Date().toISOString() }
   ],
   userLists: [
     // Sample user list items for testing price comparison

@@ -1,9 +1,12 @@
 const { Sequelize } = require('sequelize');
 const pg = require('pg');
 
-// Enforce SSL at the driver level without disabling global TLS checks
+// Enforce SSL at the driver level ONLY in production
 // This is required for providers that use self-signed certs (e.g., Render Postgres)
-pg.defaults.ssl = { require: true, rejectUnauthorized: false };
+// In development, local PostgreSQL typically doesn't support SSL
+if (process.env.NODE_ENV === 'production') {
+  pg.defaults.ssl = { require: true, rejectUnauthorized: false };
+}
 
 // Handle DATABASE_URL with SSL parameters
 const databaseUrl = process.env.DATABASE_URL || 'postgresql://localhost:5432/mygrocart';
@@ -29,10 +32,12 @@ try {
         require: true,
         rejectUnauthorized: false
       }
-    } : {},
+    } : {
+      ssl: false
+    },
     pool: {
-      max: 5,
-      min: 0,
+      max: 20,     // Increased from 5 to support more concurrent requests
+      min: 5,      // Increased from 0 to keep warm connections ready
       acquire: 30000,
       idle: 10000
     }
@@ -48,10 +53,12 @@ try {
         require: true,
         rejectUnauthorized: false
       }
-    } : {},
+    } : {
+      ssl: false
+    },
     pool: {
-      max: 5,
-      min: 0,
+      max: 20,     // Increased from 5 to support more concurrent requests
+      min: 5,      // Increased from 0 to keep warm connections ready
       acquire: 30000,
       idle: 10000
     }
@@ -64,18 +71,36 @@ const connectDB = async () => {
     console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
     console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
     console.log('Database URL being used:', (process.env.DATABASE_URL || '').replace(/\/\/.*@/, '//***:***@')); // Hide credentials in logs
-    
+
     await sequelize.authenticate();
     console.log('PostgreSQL Connected');
-    
-    // Sync models (creates tables if they don't exist)
-    await sequelize.sync({ alter: true });
-    console.log('Database synced');
+
+    // Load all models before sync (ensures all models are registered)
+    require('../models');
+
+    // Check if Products table exists (if it does, schema is already set up)
+    const [results] = await sequelize.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'Products'
+      );
+    `);
+
+    const tablesExist = results[0].exists;
+
+    if (tablesExist) {
+      console.log('Database schema already exists, skipping sync');
+    } else {
+      // Only sync if tables don't exist (fresh database)
+      await sequelize.sync();
+      console.log('Database synced');
+    }
   } catch (error) {
     console.error('Database connection error:', error);
     console.error('Error details:', error.message);
-    console.error('Failing to start server due to database connection error');
-    process.exit(1);
+    console.log('Database connection failed, using sample data for development');
+    throw error; // Re-throw to let server handle gracefully
   }
 };
 

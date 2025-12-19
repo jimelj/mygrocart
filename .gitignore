@@ -112,3 +112,16 @@ Thumbs.db
 server.log
 discovery-output.txt
 full-discovery.log
+
+# Archived code (old scraping system - kept locally for reference)
+archive/
+
+# Internal documentation (development notes, summaries, guides)
+documents/
+
+# Claude Code configuration (contains secrets)
+.claude/
+
+# Test screenshots
+test_screenshots/
+*.png

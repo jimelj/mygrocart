@@ -5,6 +5,7 @@ const { ApolloServerPluginDrainHttpServer } = require('@apollo/server/plugin/dra
 const http = require('http');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const rateLimit = require('express-rate-limit');
 
 // Load environment variables
 dotenv.config();
@@ -21,6 +22,13 @@ const typeDefs = require('./schema/typeDefs');
 const resolvers = require('./resolvers');
 const { getUser } = require('./middleware/auth');
 const { connectDB } = require('./config/database');
+
+// Import Redis configuration
+const { initializeRedis, closeRedis, getCacheStats } = require('./config/redis');
+const cacheService = require('./services/CacheService');
+
+// Import all models to ensure associations are set up
+const models = require('./models');
 
 // Import API routes
 const scrapingRoutes = require('./routes/scraping');
@@ -42,21 +50,48 @@ async function startServer() {
   // Start Apollo Server
   await server.start();
 
+  // Configure rate limiters
+  const graphqlLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.NODE_ENV === 'production' ? 100 : 1000, // 100 requests per 15 min in production, 1000 in dev
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.NODE_ENV === 'production' ? 50 : 500, // 50 requests per 15 min in production, 500 in dev
+    message: 'Too many API requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 failed attempts per 15 minutes
+    message: 'Too many authentication attempts, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true, // Don't count successful logins
+  });
+
   // Apply global middleware
   app.use(cors({
-    origin: [
-      'http://localhost:3000', 
-      'http://localhost:5173',
-      'https://mygrocart-frontend.onrender.com',
-      'https://mygrocart.onrender.com'
-    ], // Allow React dev servers and production domains
+    origin: process.env.NODE_ENV === 'development'
+      ? true // Allow all origins in development (for mobile app testing)
+      : [
+          'https://mygrocart-frontend.onrender.com',
+          'https://mygrocart.onrender.com'
+        ], // Only production domains in production
     credentials: true
   }));
   app.use(express.json()); // Parse JSON bodies for all routes
 
-  // Apply GraphQL middleware
+  // Apply GraphQL middleware with rate limiting
   app.use(
     '/graphql',
+    graphqlLimiter, // Apply rate limiting to GraphQL endpoint
     expressMiddleware(server, {
       context: async ({ req }) => {
         // Get user from token for authentication
@@ -71,8 +106,22 @@ async function startServer() {
     res.json({ status: 'OK', message: 'MyGroCart Backend is running!' });
   });
 
-  // API Routes
-  app.use('/api/scraping', scrapingRoutes);
+  // Cache statistics endpoint
+  app.get('/api/cache/stats', async (req, res) => {
+    try {
+      const stats = cacheService.getStats();
+      const redisStats = await getCacheStats();
+      res.json({
+        cacheService: stats,
+        redis: redisStats
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get cache stats' });
+    }
+  });
+
+  // API Routes with rate limiting
+  app.use('/api/scraping', apiLimiter, scrapingRoutes);
 
   // Serve static files (for potential frontend deployment)
   app.use(express.static('public'));
@@ -83,6 +132,19 @@ async function startServer() {
     console.log('Database connected for user authentication');
   } catch (error) {
     console.log('Database connection failed, using sample data for development');
+  }
+
+  // Initialize Redis cache
+  try {
+    const redisClient = await initializeRedis();
+    if (redisClient) {
+      await cacheService.initialize();
+      console.log('Redis cache initialized successfully');
+    } else {
+      console.log('Redis not configured - caching disabled (application will continue without cache)');
+    }
+  } catch (error) {
+    console.log('Redis initialization failed - caching disabled:', error.message);
   }
 
   // Start HTTP server
@@ -97,13 +159,15 @@ async function startServer() {
 }
 
 // Handle graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
+  await closeRedis();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
+  await closeRedis();
   process.exit(0);
 });
 
