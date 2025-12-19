@@ -23,6 +23,10 @@ interface Flyer {
   status: string;
 }
 
+interface GetCurrentFlyersResponse {
+  getCurrentFlyers: Flyer[];
+}
+
 export default function FlyersPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -32,7 +36,7 @@ export default function FlyersPage() {
 
   const zipCode = user?.zipCode || '07001';
 
-  const { data, loading, error } = useQuery(GET_CURRENT_FLYERS, {
+  const { data, loading, error } = useQuery<GetCurrentFlyersResponse>(GET_CURRENT_FLYERS, {
     variables: { zipCode },
     skip: !isAuthenticated || !user,
   });

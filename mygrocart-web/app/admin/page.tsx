@@ -44,6 +44,11 @@ interface ScrapingJob {
   createdAt: string;
 }
 
+// GraphQL Response Types
+interface GetScrapingJobsResponse {
+  getScrapingJobs: ScrapingJob[];
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -59,7 +64,7 @@ export default function AdminPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const { loading, data, error, refetch } = useQuery(GET_SCRAPING_JOBS, {
+  const { loading, data, error, refetch } = useQuery<GetScrapingJobsResponse>(GET_SCRAPING_JOBS, {
     variables: {
       status: statusFilter,
       limit: 50,
@@ -71,7 +76,7 @@ export default function AdminPage() {
   const [createJob, { loading: creatingJob }] =
     useMutation(CREATE_SCRAPING_JOB);
 
-  const jobs: ScrapingJob[] = (data as any)?.getScrapingJobs || [];
+  const jobs: ScrapingJob[] = data?.getScrapingJobs || [];
 
   // Calculate stats
   const stats = {

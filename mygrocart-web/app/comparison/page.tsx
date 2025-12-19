@@ -47,6 +47,15 @@ interface PriceComparisonResult {
   message: string;
 }
 
+// GraphQL Response Types
+interface GetUserGroceryListsResponse {
+  getUserGroceryLists: unknown[];
+}
+
+interface ComparePricesResponse {
+  comparePrices: PriceComparisonResult;
+}
+
 export default function ComparisonPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -58,19 +67,19 @@ export default function ComparisonPage() {
     }
   }, [isAuthenticated, router]);
 
-  const { data: groceryListData } = useQuery(GET_USER_GROCERY_LISTS, {
+  const { data: groceryListData } = useQuery<GetUserGroceryListsResponse>(GET_USER_GROCERY_LISTS, {
     variables: { userId: user?.userId },
     skip: !user?.userId
   });
 
-  const { data: priceComparisonData, loading: comparisonLoading, refetch } = useQuery(COMPARE_PRICES, {
+  const { data: priceComparisonData, loading: comparisonLoading, refetch } = useQuery<ComparePricesResponse>(COMPARE_PRICES, {
     variables: { userId: user?.userId },
     skip: !user?.userId,
     fetchPolicy: 'network-only' // Always fetch fresh prices, don't use cache
   });
 
-  const groceryList = ((groceryListData as Record<string, unknown>)?.getUserGroceryLists as unknown[]) || [];
-  const priceComparisonResult = (priceComparisonData as { comparePrices?: PriceComparisonResult })?.comparePrices;
+  const groceryList = groceryListData?.getUserGroceryLists || [];
+  const priceComparisonResult = priceComparisonData?.comparePrices;
   const priceComparison: StoreComparison[] = priceComparisonResult?.stores || [];
 
   if (!isAuthenticated || !user) {

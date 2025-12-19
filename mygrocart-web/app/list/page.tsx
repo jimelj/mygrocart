@@ -49,6 +49,18 @@ interface GroceryListItem {
   product?: Product;
 }
 
+// GraphQL Response Types
+interface SearchProductsResponse {
+  searchProducts: {
+    products: Product[];
+    totalCount: number;
+  };
+}
+
+interface GetUserGroceryListsResponse {
+  getUserGroceryLists: GroceryListItem[];
+}
+
 export default function ShoppingListPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -76,12 +88,12 @@ export default function ShoppingListPage() {
   }, [isAuthenticated, router]);
 
   // GraphQL Queries
-  const { data: productsData, loading: searchLoading } = useQuery(SEARCH_PRODUCTS, {
+  const { data: productsData, loading: searchLoading } = useQuery<SearchProductsResponse>(SEARCH_PRODUCTS, {
     variables: { query: searchQuery },
     skip: !searchQuery
   });
 
-  const { data: groceryListData, refetch: refetchGroceryList } = useQuery(GET_USER_GROCERY_LISTS, {
+  const { data: groceryListData, refetch: refetchGroceryList } = useQuery<GetUserGroceryListsResponse>(GET_USER_GROCERY_LISTS, {
     variables: { userId: user?.userId },
     skip: !user?.userId
   });

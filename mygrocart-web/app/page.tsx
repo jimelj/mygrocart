@@ -41,13 +41,28 @@ interface Flyer {
   status: string;
 }
 
+// GraphQL Response Types
+interface GetDealsNearMeResponse {
+  getDealsNearMe: {
+    deals: Deal[];
+  } | Deal[];
+}
+
+interface GetCurrentFlyersResponse {
+  getCurrentFlyers: Flyer[];
+}
+
+interface GetMyListWithDealsResponse {
+  getMyListWithDeals: ListItem[];
+}
+
 export default function Home() {
   const { isAuthenticated, user } = useAuth();
 
   const zipCode = user?.zipCode || '07001';
 
   // Fetch hot deals
-  const { data: dealsData, loading: dealsLoading } = useQuery(GET_DEALS_NEAR_ME, {
+  const { data: dealsData, loading: dealsLoading } = useQuery<GetDealsNearMeResponse>(GET_DEALS_NEAR_ME, {
     variables: {
       zipCode,
       limit: 8,
@@ -56,20 +71,23 @@ export default function Home() {
   });
 
   // Fetch current flyers
-  const { data: flyersData, loading: flyersLoading } = useQuery(GET_CURRENT_FLYERS, {
+  const { data: flyersData, loading: flyersLoading } = useQuery<GetCurrentFlyersResponse>(GET_CURRENT_FLYERS, {
     variables: { zipCode },
     skip: !isAuthenticated || !user,
   });
 
   // Fetch list with deals
-  const { data: listData } = useQuery(GET_MY_LIST_WITH_DEALS, {
+  const { data: listData } = useQuery<GetMyListWithDealsResponse>(GET_MY_LIST_WITH_DEALS, {
     variables: {
       userId: user?.userId,
     },
     skip: !isAuthenticated || !user,
   });
 
-  const hotDeals: Deal[] = dealsData?.getDealsNearMe?.deals || dealsData?.getDealsNearMe || [];
+  const getDealsResponse = dealsData?.getDealsNearMe;
+  const hotDeals: Deal[] = Array.isArray(getDealsResponse)
+    ? getDealsResponse
+    : (getDealsResponse?.deals || []);
   const flyers: Flyer[] = flyersData?.getCurrentFlyers || [];
   const listItems: ListItem[] = listData?.getMyListWithDeals || [];
   const itemsWithDeals = listItems.filter((item: ListItem) => item.matchingDeals && item.matchingDeals.length > 0);
