@@ -36,6 +36,10 @@ const scrapingRoutes = require('./routes/scraping');
 async function startServer() {
   // Create Express app
   const app = express();
+
+  // Trust proxy for rate limiting behind Render's reverse proxy
+  app.set('trust proxy', 1);
+
   const httpServer = http.createServer(app);
 
   // Create Apollo Server
