@@ -387,7 +387,7 @@ export default function ShoppingListPage() {
                                   Prices per unit:
                                 </p>
                                 <StorePriceList
-                                  storePrices={item.product.storePrices}
+                                  storePrices={storePrices || []}
                                   showDealBadge={true}
                                   variant="default"
                                 />
