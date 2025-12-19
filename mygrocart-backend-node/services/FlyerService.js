@@ -443,12 +443,146 @@ class FlyerService {
   }
 
   /**
+   * Download flyer images at a specific zoom level (for large flyers)
+   * @param {object} flyer - Flyer object from API
+   * @param {string} flyerPath - CDN path
+   * @param {number} cols - Number of columns at this zoom
+   * @param {number} rows - Number of rows at this zoom
+   * @param {number} zoomLevel - Zoom level (4 or 5)
+   * @returns {Promise<Array>} Array of image URLs
+   */
+  async downloadFlyerImagesAtZoom(flyer, flyerPath, cols, rows, zoomLevel) {
+    const TILE_SIZE = 256;
+    const BATCH_SIZE = 50;
+
+    try {
+      const totalTiles = cols * rows;
+      console.log(`[FlyerService] Downloading ${totalTiles} tiles at zoom level ${zoomLevel}...`);
+
+      // Download tiles in batches
+      const allTiles = [];
+
+      for (let batch = 0; batch < Math.ceil(totalTiles / BATCH_SIZE); batch++) {
+        const batchPromises = [];
+        const startIdx = batch * BATCH_SIZE;
+        const endIdx = Math.min(startIdx + BATCH_SIZE, totalTiles);
+
+        for (let idx = startIdx; idx < endIdx; idx++) {
+          const col = idx % cols;
+          const row = Math.floor(idx / cols);
+          const tileUrl = `${this.CDN_BASE_URL}/${flyerPath}${zoomLevel}_${col}_${row}.jpg`;
+
+          batchPromises.push(
+            axios.get(tileUrl, { responseType: 'arraybuffer', timeout: 15000 })
+              .then(response => ({
+                col,
+                row,
+                data: Buffer.from(response.data)
+              }))
+              .catch(() => null)
+          );
+        }
+
+        const batchTiles = (await Promise.all(batchPromises)).filter(t => t !== null);
+        allTiles.push(...batchTiles);
+
+        console.log(`[FlyerService] Downloaded ${allTiles.length}/${totalTiles} tiles`);
+
+        // Small delay between batches
+        if (batch < Math.ceil(totalTiles / BATCH_SIZE) - 1) {
+          await this.delay(100);
+        }
+      }
+
+      if (allTiles.length === 0) {
+        console.warn(`[FlyerService] No tiles downloaded for ${flyer.merchant}`);
+        return [`${this.CDN_BASE_URL}/${flyerPath}${zoomLevel}_0_0.jpg`];
+      }
+
+      // Create composite image
+      const compositeWidth = cols * TILE_SIZE;
+      const compositeHeight = rows * TILE_SIZE;
+
+      const compositeOps = allTiles.map(tile => ({
+        input: tile.data,
+        left: tile.col * TILE_SIZE,
+        top: (rows - 1 - tile.row) * TILE_SIZE
+      }));
+
+      const stitchedImage = await sharp({
+        create: {
+          width: compositeWidth,
+          height: compositeHeight,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 }
+        }
+      })
+      .composite(compositeOps)
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+      console.log(`[FlyerService] Stitched flyer at zoom ${zoomLevel}: ${compositeWidth}x${compositeHeight}`);
+
+      // Split into pages if very wide
+      const aspectRatio = compositeWidth / compositeHeight;
+      let pageBuffers;
+
+      if (aspectRatio > 2) {
+        pageBuffers = await this.splitIntoPages(stitchedImage, compositeWidth, compositeHeight, 0.75);
+        console.log(`[FlyerService] Split wide flyer into ${pageBuffers.length} pages`);
+      } else {
+        pageBuffers = [stitchedImage];
+      }
+
+      // Upload to Cloudinary
+      const imageUrls = [];
+      for (let i = 0; i < pageBuffers.length; i++) {
+        if (process.env.CLOUDINARY_URL) {
+          try {
+            const result = await new Promise((resolve, reject) => {
+              const uploadStream = cloudinary.uploader.upload_stream(
+                {
+                  folder: `flyers/${flyer.flyer_run_id}`,
+                  public_id: `page_${i + 1}_z${zoomLevel}`,
+                  resource_type: 'image',
+                  overwrite: true
+                },
+                (error, result) => {
+                  if (error) reject(error);
+                  else resolve(result);
+                }
+              );
+              uploadStream.end(pageBuffers[i]);
+            });
+
+            imageUrls.push(result.secure_url);
+            console.log(`[FlyerService] Uploaded page ${i + 1}/${pageBuffers.length} to Cloudinary`);
+          } catch (uploadError) {
+            console.error(`[FlyerService] Cloudinary upload failed:`, uploadError.message);
+            imageUrls.push(`${this.CDN_BASE_URL}/${flyerPath}${zoomLevel}_0_0.jpg`);
+          }
+        } else {
+          imageUrls.push(`${this.CDN_BASE_URL}/${flyerPath}${zoomLevel}_0_0.jpg`);
+        }
+
+        await this.delay(100);
+      }
+
+      return imageUrls;
+    } catch (error) {
+      console.error(`[FlyerService] Error downloading at zoom ${zoomLevel}:`, error.message);
+      return [`${this.CDN_BASE_URL}/${flyerPath}${zoomLevel}_0_0.jpg`];
+    }
+  }
+
+  /**
    * Download flyer images from CDN - now with full-page stitching
    * @param {object} flyer - Flyer object from API
    * @returns {Promise<Array>} Array of image URLs (Cloudinary or fallback CDN)
    */
   async downloadFlyerImages(flyer) {
     const TILE_SIZE = 256;
+    const MAX_TILES = 200; // Limit to prevent memory issues on Render (512MB)
 
     try {
       const flyerPath = this.parseFlyerPath(flyer);
@@ -483,7 +617,24 @@ class FlyerService {
         return [];
       }
 
-      console.log(`[FlyerService] Processing ${flyer.merchant}: ${cols}x${rows} tiles (${cols * rows} total)`);
+      const totalTiles = cols * rows;
+      console.log(`[FlyerService] Processing ${flyer.merchant}: ${cols}x${rows} tiles (${totalTiles} total)`);
+
+      // For very large flyers (like Costco with 1024 tiles), use lower zoom level
+      // to prevent memory issues on Render's 512MB limit
+      if (totalTiles > MAX_TILES) {
+        console.log(`[FlyerService] Large flyer detected (${totalTiles} tiles > ${MAX_TILES}). Using zoom level 4 instead of 5.`);
+
+        // At zoom level 4, tiles are 2x larger, so we need 1/4 as many
+        const lowerCols = Math.ceil(cols / 2);
+        const lowerRows = Math.ceil(rows / 2);
+        const lowerTiles = lowerCols * lowerRows;
+
+        console.log(`[FlyerService] Reduced to ${lowerCols}x${lowerRows} tiles (${lowerTiles} total) at zoom 4`);
+
+        // Use zoom level 4 instead of 5
+        return await this.downloadFlyerImagesAtZoom(flyer, flyerPath, lowerCols, lowerRows, 4);
+      }
 
       // Step 1: Stitch the full flyer
       const fullFlyerBuffer = await this.stitchFullFlyer(flyerPath, cols, rows);
