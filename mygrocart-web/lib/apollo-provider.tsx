@@ -6,10 +6,16 @@ import {
   InMemoryCache,
   ApolloNextAppProvider,
 } from "@apollo/client-integration-nextjs";
-import { onError, ErrorResponse } from "@apollo/client/link/error";
+import { onError } from "@apollo/client/link/error";
 import { RetryLink } from "@apollo/client/link/retry";
 import { ReactNode } from "react";
-import { GraphQLError } from "graphql";
+import { GraphQLError, GraphQLFormattedError } from "graphql";
+
+interface ErrorResponse {
+  graphQLErrors?: readonly GraphQLFormattedError[];
+  networkError?: Error;
+  operation: unknown;
+}
 
 function makeClient() {
   const httpLink = new HttpLink({
@@ -34,7 +40,7 @@ function makeClient() {
   const errorLink = onError((errorResponse: ErrorResponse) => {
     const { graphQLErrors, networkError, operation } = errorResponse;
     if (graphQLErrors) {
-      graphQLErrors.forEach((error: GraphQLError) => {
+      graphQLErrors.forEach((error) => {
         const { message, locations, path } = error;
         console.error(
           `[GraphQL error]: Message: ${message}, Location: ${JSON.stringify(locations)}, Path: ${path}`
