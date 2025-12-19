@@ -73,7 +73,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public - removed, Next.js uses public/ for static assets
 
 # Storybook build outputs
 .out
@@ -124,4 +124,4 @@ documents/
 
 # Test screenshots
 test_screenshots/
-*.png
+test_screenshots/*.png
