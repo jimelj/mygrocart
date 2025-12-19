@@ -303,9 +303,10 @@ export default function ShoppingListPage() {
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {groceryList.map((item: GroceryListItem) => {
                       const isExpanded = expandedItems.has(item.listItemId);
-                      const hasStorePrices = item.product?.storePrices && item.product.storePrices.length > 0;
+                      const storePrices = item.product?.storePrices;
+                      const hasStorePrices = storePrices && storePrices.length > 0;
                       const { subtotal, cheapestStore } = hasStorePrices
-                        ? calculateCheapestSubtotal(item.quantity, item.product.storePrices)
+                        ? calculateCheapestSubtotal(item.quantity, storePrices)
                         : { subtotal: 0, cheapestStore: 'N/A' };
 
                       return (
