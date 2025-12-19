@@ -38,6 +38,17 @@ interface Deal {
   validTo?: string;
 }
 
+interface GetDealsNearMeResponse {
+  getDealsNearMe: {
+    deals: Deal[];
+    totalCount: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    currentPage: number;
+    totalPages: number;
+  };
+}
+
 const CATEGORIES = [
   'All',
   'Dairy',
@@ -72,7 +83,7 @@ export default function DealsPage() {
   const zipCode = user?.zipCode || '07001';
 
   // GraphQL query - must be before any conditional returns
-  const { data, loading, error } = useQuery(GET_DEALS_NEAR_ME, {
+  const { data, loading, error } = useQuery<GetDealsNearMeResponse>(GET_DEALS_NEAR_ME, {
     variables: {
       zipCode,
       category: selectedCategory === 'All' ? undefined : selectedCategory,
