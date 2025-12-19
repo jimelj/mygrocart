@@ -16,7 +16,7 @@ interface Deal {
   storeName: string;
   dealType: string;
   savingsPercent?: number;
-  validTo: string;
+  validTo?: string;
   imageUrl?: string;
 }
 
