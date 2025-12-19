@@ -118,7 +118,7 @@ export function SmartItemInput({ onAddItem }: SmartItemInputProps) {
     const itemName = selectedItem || inputValue.trim();
     const suggestion = ITEM_SUGGESTIONS[itemName.toLowerCase()];
     const category = suggestion?.category;
-    const variant = selectedVariant === 'Any' ? undefined : selectedVariant;
+    const variant = selectedVariant === 'Any' || selectedVariant === null ? undefined : selectedVariant;
 
     onAddItem(itemName, variant, category);
 
