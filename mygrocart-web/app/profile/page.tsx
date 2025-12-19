@@ -22,12 +22,19 @@ const UPDATE_TRAVEL_RADIUS = gql`
   }
 `;
 
+interface UpdateTravelRadiusResponse {
+  updateTravelRadius: {
+    userId: string;
+    travelRadiusMiles: number;
+  };
+}
+
 export default function ProfilePage() {
   const { user, isAuthenticated, logout, setUser } = useAuth();
   const router = useRouter();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isEditingRadius, setIsEditingRadius] = useState(false);
-  const [updateTravelRadius, { loading: updatingRadius }] = useMutation(UPDATE_TRAVEL_RADIUS);
+  const [updateTravelRadius, { loading: updatingRadius }] = useMutation<UpdateTravelRadiusResponse>(UPDATE_TRAVEL_RADIUS);
 
   const handleRadiusChange = async (newRadius: string) => {
     try {
