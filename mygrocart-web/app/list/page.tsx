@@ -75,7 +75,7 @@ interface GetUserGroceryListsResponse {
 }
 
 export default function ShoppingListPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
@@ -93,12 +93,12 @@ export default function ShoppingListPage() {
     });
   };
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (wait for auth to load first)
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   // GraphQL Queries
   const { data: productsData, loading: searchLoading } = useQuery<SearchProductsResponse>(SEARCH_PRODUCTS, {

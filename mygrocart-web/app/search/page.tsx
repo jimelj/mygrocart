@@ -52,7 +52,7 @@ interface Product {
 
 export default function SearchPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedStore, setSelectedStore] = useState<string>("all");
@@ -67,12 +67,12 @@ export default function SearchPage() {
     ADD_GROCERY_LIST_ITEM
   );
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (wait for auth to load first)
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/login?returnUrl=/search');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   // Debounce search query
   useEffect(() => {

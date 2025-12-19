@@ -57,15 +57,15 @@ interface ComparePricesResponse {
 }
 
 export default function ComparisonPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (wait for auth to load first)
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   const { data: groceryListData } = useQuery<GetUserGroceryListsResponse>(GET_USER_GROCERY_LISTS, {
     variables: { userId: user?.userId },

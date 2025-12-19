@@ -11,15 +11,15 @@ import { ShoppingBag, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RequestsPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (wait for auth to load first)
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
 
   const { data, loading, error } = useQuery<{
     getMyProductRequests: Array<{
