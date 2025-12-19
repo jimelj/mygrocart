@@ -35,11 +35,24 @@ interface Product {
   storePrices?: StorePrice[];
 }
 
-interface StorePrice {
+interface Store {
   storeId: string;
+  chainName: string;
   storeName: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+}
+
+interface StorePrice {
+  priceId: string;
+  upc: string;
+  storeId: string;
   price: number;
   dealType?: string;
+  lastUpdated: string;
+  store: Store;
 }
 
 interface GroceryListItem {
