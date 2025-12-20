@@ -1055,7 +1055,29 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
 
             // Validate and sanitize each deal
             parsedDeals = parsedDeals.filter(d => {
-              if (!d.product_name || typeof d.sale_price !== 'number') {
+              // If sale_price is missing but quantity has "X for $Y" pattern, parse it
+              if (typeof d.sale_price !== 'number' && d.quantity) {
+                const multiBuyMatch = d.quantity.match(/(\d+)\s*for\s*\$?([\d.]+)/i);
+                if (multiBuyMatch) {
+                  const qty = parseInt(multiBuyMatch[1]);
+                  const totalPrice = parseFloat(multiBuyMatch[2]);
+                  if (qty > 0 && totalPrice > 0) {
+                    d.sale_price = totalPrice / qty; // Per-unit price
+                    d.deal_type = 'multi_buy';
+                    console.log(`[FlyerService] Parsed multi-buy: ${d.quantity} -> $${d.sale_price.toFixed(2)} each`);
+                  }
+                }
+              }
+
+              // Also try parsing sale_price if it's a string like "$3.99"
+              if (typeof d.sale_price === 'string') {
+                const priceMatch = d.sale_price.match(/\$?([\d.]+)/);
+                if (priceMatch) {
+                  d.sale_price = parseFloat(priceMatch[1]);
+                }
+              }
+
+              if (!d.product_name || typeof d.sale_price !== 'number' || isNaN(d.sale_price)) {
                 console.warn('[FlyerService] Skipping invalid deal:', d);
                 return false;
               }
