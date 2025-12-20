@@ -1539,6 +1539,62 @@ const resolvers = {
           affectedCount: 0
         };
       }
+    },
+
+    // Trigger weekly refresh for all user ZIP codes
+    adminTriggerWeeklyRefresh: async (_, __, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        console.log('[adminTriggerWeeklyRefresh] Manually triggering weekly refresh...');
+
+        const result = await flyerQueue.processWeeklyRefresh();
+
+        return {
+          success: true,
+          message: `Weekly refresh triggered: ${result.zipsProcessed} ZIP codes queued`,
+          zipsQueued: result.zipsProcessed || 0,
+          totalZips: result.totalZips || 0
+        };
+      } catch (error) {
+        console.error('[adminTriggerWeeklyRefresh] Error:', error.message, error.stack);
+        return {
+          success: false,
+          message: error.message,
+          zipsQueued: 0,
+          totalZips: 0
+        };
+      }
+    },
+
+    // Refresh flyers that are expiring soon
+    adminRefreshExpiringFlyers: async (_, __, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        console.log('[adminRefreshExpiringFlyers] Checking for expiring flyers...');
+
+        const result = await flyerQueue.refreshExpiringFlyers();
+
+        return {
+          success: true,
+          message: `Expiring flyer refresh: ${result.refreshed} ZIP codes queued`,
+          zipsQueued: result.refreshed || 0,
+          totalZips: result.total || 0
+        };
+      } catch (error) {
+        console.error('[adminRefreshExpiringFlyers] Error:', error.message, error.stack);
+        return {
+          success: false,
+          message: error.message,
+          zipsQueued: 0,
+          totalZips: 0
+        };
+      }
     }
   },
 

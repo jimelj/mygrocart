@@ -458,6 +458,19 @@ const typeDefs = gql`
 
     # Clear all flyers for a ZIP code (admin only)
     adminClearFlyersForZip(zipCode: String!): AdminActionResult!
+
+    # Trigger weekly refresh for all user ZIP codes (admin only)
+    adminTriggerWeeklyRefresh: WeeklyRefreshResult!
+
+    # Refresh flyers that are expiring soon (admin only)
+    adminRefreshExpiringFlyers: WeeklyRefreshResult!
+  }
+
+  type WeeklyRefreshResult {
+    success: Boolean!
+    message: String!
+    zipsQueued: Int!
+    totalZips: Int!
   }
 
   # ===================================================================
