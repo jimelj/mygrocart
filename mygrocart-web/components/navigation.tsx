@@ -122,13 +122,15 @@ export function Navigation() {
                       Profile Settings
                     </Link>
                   </DropdownMenuItem>
-                  {/* Admin link - shown to all authenticated users for now */}
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin" className="cursor-pointer">
-                      <Shield className="mr-2 h-4 w-4" />
-                      Admin Dashboard
-                    </Link>
-                  </DropdownMenuItem>
+                  {/* Admin link - only shown to admins */}
+                  {user?.isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="cursor-pointer">
+                        <Shield className="mr-2 h-4 w-4" />
+                        Admin Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -209,17 +211,19 @@ export function Navigation() {
                         Profile Settings
                       </Link>
                     </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      asChild
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <Link href="/admin">
-                        <Shield className="mr-2 h-4 w-4" />
-                        Admin Dashboard
-                      </Link>
-                    </Button>
+                    {user?.isAdmin && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin">
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Dashboard
+                        </Link>
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       className="w-full justify-start text-red-600 hover:text-red-700"
