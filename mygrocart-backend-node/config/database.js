@@ -96,6 +96,20 @@ const connectDB = async () => {
       await sequelize.sync();
       console.log('Database synced');
     }
+
+    // Ensure demo user is an admin (for testing/demo purposes)
+    try {
+      const User = require('../models/User');
+      const [updated] = await User.update(
+        { isAdmin: true },
+        { where: { email: 'demo@mygrocart.com' } }
+      );
+      if (updated > 0) {
+        console.log('Demo user set as admin');
+      }
+    } catch (adminErr) {
+      console.log('Could not set demo user as admin:', adminErr.message);
+    }
   } catch (error) {
     console.error('Database connection error:', error);
     console.error('Error details:', error.message);
