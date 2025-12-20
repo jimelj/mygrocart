@@ -884,6 +884,8 @@ const resolvers = {
             matches.push({
               deal: {
                 ...dealPlain,
+                // Convert dealType to uppercase for GraphQL enum
+                dealType: (dealPlain.dealType || 'sale').toUpperCase(),
                 savings: dealPlain.regularPrice
                   ? parseFloat((dealPlain.regularPrice - dealPlain.salePrice).toFixed(2))
                   : null,
@@ -1923,6 +1925,8 @@ const resolvers = {
             const dealPlain = deal.get({ plain: true });
             return {
               ...dealPlain,
+              // Convert dealType to uppercase for GraphQL enum
+              dealType: (dealPlain.dealType || 'sale').toUpperCase(),
               savings: dealPlain.regularPrice
                 ? parseFloat((dealPlain.regularPrice - dealPlain.salePrice).toFixed(2))
                 : null,
