@@ -1894,6 +1894,14 @@ const resolvers = {
     }
   },
 
+  // Deal field resolver to convert dealType to uppercase for GraphQL enum
+  Deal: {
+    dealType: (parent) => {
+      // Database stores lowercase, GraphQL enum expects uppercase
+      return (parent.dealType || 'sale').toUpperCase();
+    }
+  },
+
   // UserListItem field resolver for matching deals
   UserListItem: {
     matchingDeals: async (parent) => {
