@@ -1514,6 +1514,61 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
   }
 
   /**
+   * Delete existing flyers for a ZIP code to allow re-processing
+   * @param {string} zipCode - ZIP code to clear flyers for
+   * @returns {Promise<{deleted: number}>}
+   */
+  async clearFlyersForZip(zipCode) {
+    try {
+      // First delete associated deals
+      const flyers = await Flyer.findAll({
+        where: { zipCode },
+        attributes: ['id']
+      });
+
+      const flyerIds = flyers.map(f => f.id);
+
+      if (flyerIds.length > 0) {
+        await Deal.destroy({
+          where: { flyerId: flyerIds }
+        });
+
+        const deleted = await Flyer.destroy({
+          where: { zipCode }
+        });
+
+        console.log(`[FlyerService] Cleared ${deleted} flyers and associated deals for ZIP ${zipCode}`);
+        return { deleted };
+      }
+
+      return { deleted: 0 };
+    } catch (error) {
+      console.error(`[FlyerService] Error clearing flyers for ZIP ${zipCode}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Force re-process all flyers for a ZIP code (deletes and re-fetches)
+   * @param {string} zipCode - ZIP code to re-process
+   * @returns {Promise<object>} Processing result
+   */
+  async reprocessFlyersForZip(zipCode) {
+    console.log(`[FlyerService] Force re-processing all flyers for ZIP ${zipCode}...`);
+
+    // Clear existing flyers
+    const { deleted } = await this.clearFlyersForZip(zipCode);
+    console.log(`[FlyerService] Deleted ${deleted} existing flyers for ZIP ${zipCode}`);
+
+    // Fetch and process fresh flyers
+    const result = await this.processFlyersByZip(zipCode);
+    return {
+      ...result,
+      previouslyDeleted: deleted
+    };
+  }
+
+  /**
    * Helper: Delay execution for rate limiting
    * @param {number} ms - Milliseconds to delay
    * @returns {Promise<void>}

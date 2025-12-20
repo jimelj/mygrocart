@@ -506,6 +506,19 @@ const typeDefs = gql`
 
     # Complete missing flyers for a ZIP code (admin only)
     completeMissingFlyers(zipCode: String!): FlyerCompletionResult!
+
+    # Force re-process all flyers for a ZIP code (deletes and re-fetches with new quality settings)
+    reprocessFlyers(zipCode: String!): FlyerReprocessResult!
+  }
+
+  type FlyerReprocessResult {
+    success: Boolean!
+    zipCode: String!
+    previouslyDeleted: Int!
+    flyersProcessed: Int!
+    newFlyers: Int!
+    totalDeals: Int!
+    message: String
   }
 
   type FlyerCompletionResult {

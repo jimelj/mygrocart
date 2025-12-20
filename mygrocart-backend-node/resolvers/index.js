@@ -2183,6 +2183,50 @@ const resolvers = {
           message: error.message
         };
       }
+    },
+
+    reprocessFlyers: async (_, { zipCode }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        // Validate ZIP code
+        if (!zipCode || !/^\d{5}$/.test(zipCode)) {
+          return {
+            success: false,
+            zipCode: zipCode || '',
+            previouslyDeleted: 0,
+            flyersProcessed: 0,
+            newFlyers: 0,
+            totalDeals: 0,
+            message: 'Invalid ZIP code format'
+          };
+        }
+
+        console.log(`[reprocessFlyers] Force re-processing all flyers for ZIP ${zipCode}...`);
+
+        const result = await flyerService.reprocessFlyersForZip(zipCode);
+
+        return {
+          success: result.success,
+          zipCode: result.zipCode,
+          previouslyDeleted: result.previouslyDeleted || 0,
+          flyersProcessed: result.flyersProcessed || 0,
+          newFlyers: result.newFlyers || 0,
+          totalDeals: result.totalDeals || 0,
+          message: result.message
+        };
+      } catch (error) {
+        console.error('[reprocessFlyers] Error:', error.message, error.stack);
+        return {
+          success: false,
+          zipCode,
+          previouslyDeleted: 0,
+          flyersProcessed: 0,
+          newFlyers: 0,
+          totalDeals: 0,
+          message: error.message
+        };
+      }
     }
   },
 
