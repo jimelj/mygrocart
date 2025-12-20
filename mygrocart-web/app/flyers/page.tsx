@@ -161,11 +161,11 @@ export default function FlyersPage() {
                 {/* Zoomable Image */}
                 <TransformWrapper
                   ref={transformRef}
-                  initialScale={1}
+                  initialScale={1.5}
                   minScale={0.5}
-                  maxScale={4}
+                  maxScale={5}
                   centerOnInit
-                  wheel={{ step: 0.1 }}
+                  wheel={{ step: 0.15 }}
                   doubleClick={{ mode: "toggle", step: 2 }}
                   pinch={{ step: 5 }}
                 >
