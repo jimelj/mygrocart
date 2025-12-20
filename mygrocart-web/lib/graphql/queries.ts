@@ -42,7 +42,8 @@ export const SEARCH_PRODUCTS = gql`
   }
 `;
 
-// Get user grocery lists
+// DEPRECATED: Get user grocery lists (UPC-based, replaced by GET_MY_LIST_WITH_DEALS)
+// Use GET_MY_LIST_WITH_DEALS for the new flyer-based shopping list system
 export const GET_USER_GROCERY_LISTS = gql`
   query GetUserGroceryLists($userId: String!) {
     getUserGroceryLists(userId: $userId) {
@@ -79,7 +80,8 @@ export const GET_USER_GROCERY_LISTS = gql`
   }
 `;
 
-// Compare prices
+// DEPRECATED: Compare prices (UPC-based, replaced by MATCH_DEALS_TO_MY_LIST)
+// Use MATCH_DEALS_TO_MY_LIST for the new flyer-based deal matching
 export const COMPARE_PRICES = gql`
   query ComparePrices($userId: String!) {
     comparePrices(userId: $userId) {
@@ -155,7 +157,8 @@ export const LOGIN = gql`
   }
 `;
 
-// Grocery list mutations
+// DEPRECATED: Grocery list mutations (UPC-based, replaced by mutations in mutations.ts)
+// Use ADD_LIST_ITEM, UPDATE_LIST_ITEM, REMOVE_LIST_ITEM for the new flyer-based system
 export const ADD_GROCERY_LIST_ITEM = gql`
   mutation AddGroceryListItem($userId: String!, $upc: String!, $quantity: Int!) {
     addGroceryListItem(userId: $userId, upc: $upc, quantity: $quantity) {
@@ -365,8 +368,12 @@ export const GET_MY_LIST_WITH_DEALS = gql`
         regularPrice
         storeName
         dealType
+        savings
         savingsPercent
+        validFrom
+        validTo
       }
+      createdAt
     }
   }
 `;
@@ -383,12 +390,18 @@ export const MATCH_DEALS_TO_MY_LIST = gql`
         regularPrice
         storeName
         dealType
+        savings
         savingsPercent
+        validFrom
+        validTo
+        imageUrl
       }
       listItem {
         id
         itemName
         itemVariant
+        category
+        quantity
       }
       matchScore
       matchReason

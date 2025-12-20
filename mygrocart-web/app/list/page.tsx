@@ -5,95 +5,65 @@ import { useQuery, useMutation } from '@apollo/client/react';
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Plus, Minus, ShoppingCart, ChevronDown, ChevronUp, DollarSign } from 'lucide-react';
-import Image from 'next/image';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ShoppingCart, Plus, Minus, Trash2, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import {
-  SEARCH_PRODUCTS,
-  GET_USER_GROCERY_LISTS,
-  ADD_GROCERY_LIST_ITEM,
-  UPDATE_GROCERY_LIST_ITEM,
-  REMOVE_GROCERY_LIST_ITEM
+  GET_MY_LIST_WITH_DEALS,
+  MATCH_DEALS_TO_MY_LIST
 } from '@/lib/graphql/queries';
-import { REQUEST_PRICE_UPDATE } from '@/lib/graphql/mutations';
-import { EmptySearchState } from '@/components/search/EmptySearchState';
-import { PriceFreshnessBadge } from '@/components/ui/PriceFreshnessBadge';
-import { StorePriceList } from '@/components/ui/StorePriceList';
-import { useToast } from '@/components/ui/use-toast';
-import { calculateCheapestSubtotal } from '@/lib/utils/price-helpers';
+import {
+  ADD_LIST_ITEM,
+  UPDATE_LIST_ITEM,
+  REMOVE_LIST_ITEM
+} from '@/lib/graphql/mutations';
+import { SmartItemInput } from '@/components/list/SmartItemInput';
+import { DealBadge } from '@/components/deals/DealBadge';
 
-interface Product {
-  upc: string;
-  name: string;
-  brand?: string;
-  size?: string;
-  imageUrl?: string;
-  priceAge?: string;
-  lastPriceUpdate?: string;
-  storePrices?: StorePrice[];
-}
-
-interface Store {
-  storeId: string;
-  chainName: string;
+interface MatchingDeal {
+  id: string;
+  productName: string;
+  salePrice: number;
+  regularPrice?: number;
   storeName: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  dealType: string;
+  savingsPercent?: number;
 }
 
-interface StorePrice {
-  priceId: string;
-  upc: string;
-  storeId: string;
-  price: number;
-  dealType?: string;
-  lastUpdated: string;
-  store: Store;
-}
-
-interface GroceryListItem {
-  listItemId: string;
-  upc: string;
+interface ListItem {
+  id: string;
+  itemName: string;
+  itemVariant?: string;
+  category?: string;
   quantity: number;
-  product?: Product;
+  checked: boolean;
+  matchingDeals?: MatchingDeal[];
 }
 
-// GraphQL Response Types
-interface SearchProductsResponse {
-  searchProducts: {
-    products: Product[];
-    totalCount: number;
-  };
-}
-
-interface GetUserGroceryListsResponse {
-  getUserGroceryLists: GroceryListItem[];
+interface GetMyListWithDealsResponse {
+  getMyListWithDeals: ListItem[];
 }
 
 export default function ShoppingListPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const toggleItemExpanded = (listItemId: string) => {
+  const toggleItemExpanded = (id: string) => {
     setExpandedItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(listItemId)) {
-        newSet.delete(listItemId);
+      if (newSet.has(id)) {
+        newSet.delete(id);
       } else {
-        newSet.add(listItemId);
+        newSet.add(id);
       }
       return newSet;
     });
   };
 
-  // Redirect to login if not authenticated (wait for auth to load first)
+  // Redirect to login if not authenticated
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
@@ -101,346 +71,390 @@ export default function ShoppingListPage() {
   }, [isAuthenticated, isLoading, router]);
 
   // GraphQL Queries
-  const { data: productsData, loading: searchLoading } = useQuery<SearchProductsResponse>(SEARCH_PRODUCTS, {
-    variables: { query: searchQuery },
-    skip: !searchQuery
-  });
-
-  const { data: groceryListData, refetch: refetchGroceryList } = useQuery<GetUserGroceryListsResponse>(GET_USER_GROCERY_LISTS, {
+  const { data, loading, error, refetch } = useQuery<GetMyListWithDealsResponse>(GET_MY_LIST_WITH_DEALS, {
     variables: { userId: user?.userId },
     skip: !user?.userId
   });
 
   // GraphQL Mutations
-  const [addGroceryListItem] = useMutation(ADD_GROCERY_LIST_ITEM);
-  const [updateGroceryListItem] = useMutation(UPDATE_GROCERY_LIST_ITEM);
-  const [removeGroceryListItem] = useMutation(REMOVE_GROCERY_LIST_ITEM);
-  const [requestPriceUpdate] = useMutation(REQUEST_PRICE_UPDATE);
+  const [addItem] = useMutation(ADD_LIST_ITEM, {
+    refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+    onError: (error) => {
+      console.error('Error adding item:', error);
+    }
+  });
 
-  const handleAddProduct = async (product: Product) => {
+  const [updateItem] = useMutation(UPDATE_LIST_ITEM, {
+    refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+    onError: (error) => {
+      console.error('Error updating item:', error);
+    }
+  });
+
+  const [removeItem] = useMutation(REMOVE_LIST_ITEM, {
+    refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+    onError: (error) => {
+      console.error('Error removing item:', error);
+    }
+  });
+
+  // Handlers
+  const handleAddItem = async (itemName: string, itemVariant?: string, category?: string) => {
     try {
-      await addGroceryListItem({
+      await addItem({
         variables: {
-          userId: user?.userId,
-          upc: product.upc,
-          quantity: 1
-        }
+          itemName,
+          itemVariant,
+          category,
+          quantity: 1,
+        },
       });
-      refetchGroceryList();
     } catch (error) {
-      console.error('Error adding product:', error);
+      console.error('Failed to add item:', error);
     }
   };
 
-  const handleUpdateQuantity = async (listItemId: string, quantity: number) => {
+  const handleUpdateQuantity = async (id: string, newQuantity: number) => {
+    if (newQuantity < 1) return;
+
     try {
-      if (quantity <= 0) {
-        await removeGroceryListItem({
-          variables: { listItemId }
-        });
-      } else {
-        await updateGroceryListItem({
-          variables: { listItemId, quantity }
-        });
-      }
-      refetchGroceryList();
+      await updateItem({
+        variables: {
+          id,
+          quantity: newQuantity,
+        },
+      });
     } catch (error) {
-      console.error('Error updating quantity:', error);
+      console.error('Failed to update quantity:', error);
     }
   };
 
-  const handleRequestPriceUpdate = async (upc: string) => {
+  const handleToggleChecked = async (id: string, checked: boolean) => {
     try {
-      await requestPriceUpdate({
-        variables: { upc, priority: 'normal' }
-      });
-      toast({
-        title: 'Update requested!',
-        description: 'We\'ll refresh the price for this product soon.',
-        variant: 'success',
-        duration: 3000
+      await updateItem({
+        variables: {
+          id,
+          checked: !checked,
+        },
       });
     } catch (error) {
-      console.error('Error requesting price update:', error);
-      toast({
-        title: 'Request failed',
-        description: 'Could not request price update. Please try again.',
-        variant: 'destructive'
-      });
+      console.error('Failed to toggle checked:', error);
     }
   };
 
-  const groceryList: GroceryListItem[] = groceryListData?.getUserGroceryLists || [];
+  const handleRemoveItem = async (id: string) => {
+    try {
+      await removeItem({
+        variables: { id },
+      });
+      setDeleteConfirmId(null);
+    } catch (error) {
+      console.error('Failed to remove item:', error);
+    }
+  };
+
+  const listItems: ListItem[] = data?.getMyListWithDeals || [];
+  const totalMatchedDeals = listItems.reduce((sum, item) => sum + (item.matchingDeals?.length || 0), 0);
 
   if (!isAuthenticated || !user) {
     return null; // Will redirect
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <p className="text-gray-600">Loading your shopping list...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <div className="w-16 h-16 mb-4 text-red-500">
+              <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-xl font-semibold text-gray-900 mb-2">Error Loading List</p>
+            <p className="text-gray-600 mb-4">{error.message}</p>
+            <Button onClick={() => refetch()} className="bg-green-600 hover:bg-green-700">
+              Try Again
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
             <ShoppingCart className="w-6 h-6 text-green-600" />
-            <h1 className="text-3xl font-bold text-gray-900">My Shopping List</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Shopping List</h1>
           </div>
-          <p className="text-gray-600">Add products and find the best deals</p>
+          <p className="text-gray-600">
+            {listItems.length} {listItems.length === 1 ? 'item' : 'items'}
+            {totalMatchedDeals > 0 && (
+              <span className="ml-2 text-orange-600 font-medium">
+                • {totalMatchedDeals} {totalMatchedDeals === 1 ? 'deal' : 'deals'} matched
+              </span>
+            )}
+          </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Product Search Section */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Search Products</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search for products..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+        {/* Main Content */}
+        <div className="space-y-6">
+          {/* Smart Input Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Add Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SmartItemInput onAddItem={handleAddItem} />
+            </CardContent>
+          </Card>
 
-                {searchLoading && (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-                    <p className="mt-2 text-gray-500">Searching...</p>
+          {/* List Items Section */}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5" />
+                    Your Items
                   </div>
-                )}
-
-                {productsData?.searchProducts?.products && productsData.searchProducts.products.length > 0 && (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {(productsData.searchProducts.products as Product[]).map((product: Product) => (
-                      <div
-                        key={product.upc}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center space-x-3 flex-1">
-                          {product.imageUrl ? (
-                            <Image
-                              src={product.imageUrl}
-                              alt={product.name}
-                              width={48}
-                              height={48}
-                              className="rounded object-contain"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
-                              <span className="text-2xl">📦</span>
-                            </div>
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{product.name}</h4>
-                            <p className="text-sm text-gray-600">
-                              {product.brand} {product.size && `- ${product.size}`}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                              {product.priceAge && (
-                                <PriceFreshnessBadge
-                                  priceAge={product.priceAge}
-                                  lastPriceUpdate={product.lastPriceUpdate}
-                                />
-                              )}
-                              {product.priceAge && product.priceAge.includes('day') && parseInt(product.priceAge) >= 8 && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRequestPriceUpdate(product.upc)}
-                                  className="text-xs"
-                                >
-                                  Request Update
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => handleAddProduct(product)}
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {searchQuery && productsData?.searchProducts?.products?.length === 0 && !searchLoading && (
-                  <EmptySearchState searchTerm={searchQuery} />
-                )}
-
-                {!searchQuery && (
-                  <div className="text-center py-8 text-gray-500">
-                    Start typing to search for products
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Shopping List Section */}
-          <div>
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="w-5 h-5" />
-                      Your Shopping List ({groceryList.length} items)
-                    </div>
-                  </CardTitle>
-                  {groceryList.length > 0 && (
-                    <Link href="/comparison">
-                      <Button className="bg-green-600 hover:bg-green-700">
-                        Compare Prices
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {groceryList.length === 0 ? (
-                  <div className="text-center py-12">
-                    <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-gray-500 mb-2">Your shopping list is empty</p>
-                    <p className="text-sm text-gray-400">
-                      Search for products to add them to your list
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {groceryList.map((item: GroceryListItem) => {
-                      const isExpanded = expandedItems.has(item.listItemId);
-                      const storePrices = item.product?.storePrices;
-                      const hasStorePrices = storePrices && storePrices.length > 0;
-                      const { subtotal, cheapestStore } = hasStorePrices
-                        ? calculateCheapestSubtotal(item.quantity, storePrices)
-                        : { subtotal: 0, cheapestStore: 'N/A' };
-
-                      return (
-                        <div
-                          key={item.listItemId}
-                          className="border rounded-lg hover:shadow-sm transition-shadow"
-                        >
-                          {/* Item Header */}
-                          <div className="flex items-center justify-between p-3">
-                            <div className="flex items-center space-x-3 flex-1">
-                              {item.product?.imageUrl ? (
-                                <Image
-                                  src={item.product.imageUrl}
-                                  alt={item.product.name || 'Product'}
-                                  width={48}
-                                  height={48}
-                                  className="rounded object-contain"
-                                />
-                              ) : (
-                                <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center">
-                                  <span className="text-2xl">📦</span>
-                                </div>
-                              )}
-                              <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">
-                                  {item.product?.name || 'Unknown Product'}
-                                </h4>
-                                <p className="text-sm text-gray-600">
-                                  {item.product?.brand} {item.product?.size && `- ${item.product.size}`}
-                                </p>
-                                {hasStorePrices && !isExpanded && (
-                                  <p className="text-xs text-green-600 mt-1">
-                                    Best at {cheapestStore}: ${subtotal.toFixed(2)}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleUpdateQuantity(item.listItemId, item.quantity - 1)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Minus className="w-4 h-4" />
-                              </Button>
-                              <span className="w-8 text-center font-medium">{item.quantity}</span>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleUpdateQuantity(item.listItemId, item.quantity + 1)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </Button>
-                              {hasStorePrices && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => toggleItemExpanded(item.listItemId)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  {isExpanded ? (
-                                    <ChevronUp className="w-4 h-4" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4" />
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Expanded Price Details */}
-                          {isExpanded && hasStorePrices && (
-                            <div className="px-3 pb-3 pt-0 border-t bg-gray-50">
-                              <div className="mt-3">
-                                <p className="text-sm font-semibold text-gray-700 mb-2">
-                                  Prices per unit:
-                                </p>
-                                <StorePriceList
-                                  storePrices={storePrices || []}
-                                  showDealBadge={true}
-                                  variant="default"
-                                />
-                                <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                                  <span className="text-sm text-gray-600">
-                                    Best subtotal ({item.quantity} × cheapest):
-                                  </span>
-                                  <span className="text-lg font-bold text-green-600">
-                                    ${subtotal.toFixed(2)} at {cheapestStore}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {groceryList.length > 0 && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-green-900">Ready to compare prices?</p>
-                    <p className="text-sm text-green-700">
-                      See which store offers the best deal on your list
-                    </p>
-                  </div>
-                  <Link href="/comparison">
+                </CardTitle>
+                {listItems.length > 0 && totalMatchedDeals > 0 && (
+                  <Link href="/deals/matches">
                     <Button className="bg-green-600 hover:bg-green-700">
-                      Compare Now
+                      <Tag className="w-4 h-4 mr-2" />
+                      View All Deals
                     </Button>
                   </Link>
-                </div>
+                )}
               </div>
-            )}
-          </div>
+            </CardHeader>
+            <CardContent>
+              {listItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <p className="text-gray-500 mb-2 font-medium">Your list is empty</p>
+                  <p className="text-sm text-gray-400">
+                    Start adding items to find matching deals
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {listItems.map((item) => {
+                    const isExpanded = expandedItems.has(item.id);
+                    const dealCount = item.matchingDeals?.length || 0;
+                    const displayName = item.itemVariant
+                      ? `${item.itemName} (${item.itemVariant})`
+                      : item.itemName;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="border rounded-lg hover:shadow-md transition-all duration-200"
+                      >
+                        {/* Item Row */}
+                        <div className="flex items-center gap-3 p-4">
+                          {/* Checkbox */}
+                          <div
+                            onClick={() => handleToggleChecked(item.id, item.checked)}
+                            className="cursor-pointer"
+                          >
+                            <Checkbox
+                              checked={item.checked}
+                              className="w-5 h-5"
+                            />
+                          </div>
+
+                          {/* Item Info */}
+                          <div className="flex-1 min-w-0">
+                            <h4
+                              className={`font-semibold text-gray-900 ${
+                                item.checked ? 'line-through text-gray-400' : ''
+                              }`}
+                            >
+                              {displayName}
+                            </h4>
+                            {item.category && (
+                              <p className="text-sm text-gray-500">{item.category}</p>
+                            )}
+                          </div>
+
+                          {/* Deal Badge */}
+                          {dealCount > 0 && (
+                            <DealBadge count={dealCount} />
+                          )}
+
+                          {/* Quantity Controls */}
+                          <div className="flex items-center gap-2 bg-gray-100 rounded-lg px-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                              className="h-8 w-8 p-0 hover:bg-gray-200"
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </Button>
+                            <span className="w-8 text-center font-medium">{item.quantity}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                              className="h-8 w-8 p-0 hover:bg-gray-200"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </div>
+
+                          {/* Expand/Delete Controls */}
+                          <div className="flex items-center gap-1">
+                            {dealCount > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleItemExpanded(item.id)}
+                                className="h-8 w-8 p-0"
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteConfirmId(item.id)}
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Expanded Deal Preview */}
+                        {isExpanded && dealCount > 0 && (
+                          <div className="px-4 pb-4 pt-0 border-t bg-gray-50">
+                            <p className="text-sm font-semibold text-gray-700 mb-3 mt-3">
+                              Matching Deals:
+                            </p>
+                            <div className="space-y-2">
+                              {item.matchingDeals?.slice(0, 3).map((deal) => (
+                                <div
+                                  key={deal.id}
+                                  className="flex items-center justify-between p-3 bg-white rounded-lg border"
+                                >
+                                  <div className="flex-1">
+                                    <p className="font-medium text-gray-900 text-sm">
+                                      {deal.productName}
+                                    </p>
+                                    <p className="text-xs text-gray-500">{deal.storeName}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-lg font-bold text-green-600">
+                                      ${deal.salePrice.toFixed(2)}
+                                    </p>
+                                    {deal.regularPrice && deal.savingsPercent && (
+                                      <p className="text-xs text-gray-500 line-through">
+                                        ${deal.regularPrice.toFixed(2)}
+                                      </p>
+                                    )}
+                                    {deal.savingsPercent && (
+                                      <p className="text-xs text-orange-600 font-medium">
+                                        Save {deal.savingsPercent}%
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {dealCount > 3 && (
+                              <Link href="/deals/matches">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full mt-3 text-green-600 border-green-600 hover:bg-green-50"
+                                >
+                                  View all {dealCount} deals
+                                </Button>
+                              </Link>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Delete Confirmation */}
+                        {deleteConfirmId === item.id && (
+                          <div className="px-4 pb-4 pt-0 border-t bg-red-50">
+                            <div className="flex items-center justify-between py-3">
+                              <p className="text-sm text-gray-700">
+                                Remove <strong>{displayName}</strong> from your list?
+                              </p>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setDeleteConfirmId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Call-to-Action Section */}
+          {listItems.length > 0 && totalMatchedDeals > 0 && (
+            <div className="p-6 bg-gradient-to-r from-green-50 to-orange-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-gray-900 mb-1">
+                    Ready to save on your groceries?
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    We found {totalMatchedDeals} matching {totalMatchedDeals === 1 ? 'deal' : 'deals'} for items on your list
+                  </p>
+                </div>
+                <Link href="/deals/matches">
+                  <Button className="bg-green-600 hover:bg-green-700 shadow-md">
+                    <Tag className="w-4 h-4 mr-2" />
+                    View Matched Deals
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

@@ -1,22 +1,35 @@
 "use client";
 
 import React from 'react';
-import { Flame } from 'lucide-react';
+import { Tag } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface DealBadgeProps {
   count: number;
+  onClick?: () => void;
   className?: string;
 }
 
-export function DealBadge({ count, className = '' }: DealBadgeProps) {
+/**
+ * DealBadge - Shows count of matching deals for a list item
+ * - Green badge with number (e.g., "3 deals")
+ * - Clickable to expand/show deals
+ */
+export function DealBadge({ count, onClick, className }: DealBadgeProps) {
   if (count === 0) return null;
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 ${className}`}
+    <Badge
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 hover:bg-green-200 border-green-300 transition-colors",
+        onClick && "cursor-pointer",
+        className
+      )}
     >
-      <Flame className="w-3 h-3" />
-      <span>{count}</span>
-    </span>
+      <Tag className="w-3 h-3" />
+      <span>{count} {count === 1 ? 'deal' : 'deals'}</span>
+    </Badge>
   );
 }

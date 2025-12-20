@@ -39,6 +39,7 @@ export const ADD_LIST_ITEM = gql`
       category
       quantity
       checked
+      createdAt
     }
   }
 `;
@@ -48,6 +49,9 @@ export const UPDATE_LIST_ITEM = gql`
   mutation UpdateListItem($id: ID!, $quantity: Int, $checked: Boolean) {
     updateListItem(id: $id, quantity: $quantity, checked: $checked) {
       id
+      itemName
+      itemVariant
+      category
       quantity
       checked
     }

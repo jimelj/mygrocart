@@ -13,66 +13,227 @@ interface ItemSuggestion {
 }
 
 const ITEM_SUGGESTIONS: Record<string, ItemSuggestion> = {
+  // Dairy
   milk: {
     category: 'Dairy',
-    variants: ['Any', 'Whole', '2%', 'Skim', 'Organic', 'Non-Dairy'],
-  },
-  chicken: {
-    category: 'Meat',
-    variants: ['Any', 'Breast', 'Thighs', 'Wings', 'Ground'],
-  },
-  bread: {
-    category: 'Bakery',
-    variants: ['Any', 'White', 'Wheat', 'Whole Grain'],
-  },
-  eggs: {
-    category: 'Dairy',
-    variants: ['Any', 'Large', 'Organic', 'Cage-Free'],
+    variants: ['Any', 'Whole', '2%', 'Skim', 'Organic', 'Non-Dairy', 'Almond', 'Oat', 'Soy']
   },
   cheese: {
     category: 'Dairy',
-    variants: ['Any', 'Cheddar', 'Mozzarella', 'American'],
+    variants: ['Any', 'Cheddar', 'Mozzarella', 'American', 'Swiss', 'Parmesan', 'String Cheese']
   },
   yogurt: {
     category: 'Dairy',
-    variants: ['Any', 'Greek', 'Regular', 'Non-Dairy'],
+    variants: ['Any', 'Greek', 'Regular', 'Non-Dairy', 'Kids', 'Vanilla', 'Strawberry']
   },
-  cereal: {
-    category: 'Breakfast',
-    variants: ['Any', 'Kids', 'Healthy', 'Granola'],
+  eggs: {
+    category: 'Dairy',
+    variants: ['Any', 'Large', 'Extra Large', 'Organic', 'Cage-Free', 'Brown', 'White']
   },
-  juice: {
-    category: 'Beverages',
-    variants: ['Any', 'Orange', 'Apple', 'Grape'],
+  butter: {
+    category: 'Dairy',
+    variants: ['Any', 'Salted', 'Unsalted', 'Organic', 'European']
   },
-  soda: {
-    category: 'Beverages',
-    variants: ['Any', 'Cola', 'Lemon-Lime', 'Diet'],
+
+  // Meat & Seafood
+  chicken: {
+    category: 'Meat',
+    variants: ['Any', 'Breast', 'Thighs', 'Wings', 'Drumsticks', 'Ground', 'Whole', 'Organic']
   },
-  chips: {
-    category: 'Snacks',
-    variants: ['Any', 'Potato', 'Tortilla', 'Pita'],
+  beef: {
+    category: 'Meat',
+    variants: ['Any', 'Ground', 'Steak', 'Roast', 'Stew Meat', 'Grass-Fed', 'Organic']
   },
+  pork: {
+    category: 'Meat',
+    variants: ['Any', 'Chops', 'Tenderloin', 'Ground', 'Bacon', 'Sausage', 'Ribs']
+  },
+  turkey: {
+    category: 'Meat',
+    variants: ['Any', 'Ground', 'Breast', 'Deli Slices', 'Whole']
+  },
+  fish: {
+    category: 'Seafood',
+    variants: ['Any', 'Salmon', 'Tuna', 'Cod', 'Tilapia', 'Shrimp', 'Frozen', 'Fresh']
+  },
+
+  // Produce
   bananas: {
     category: 'Produce',
-    variants: ['Any', 'Organic'],
+    variants: ['Any', 'Organic']
   },
   apples: {
     category: 'Produce',
-    variants: ['Any', 'Gala', 'Fuji', 'Granny Smith', 'Organic'],
+    variants: ['Any', 'Gala', 'Fuji', 'Honeycrisp', 'Granny Smith', 'Organic']
   },
-  rice: {
-    category: 'Pantry',
-    variants: ['Any', 'White', 'Brown', 'Jasmine', 'Basmati'],
+  oranges: {
+    category: 'Produce',
+    variants: ['Any', 'Navel', 'Mandarin', 'Clementines', 'Organic']
   },
-  pasta: {
-    category: 'Pantry',
-    variants: ['Any', 'Spaghetti', 'Penne', 'Fettuccine'],
+  berries: {
+    category: 'Produce',
+    variants: ['Any', 'Strawberries', 'Blueberries', 'Raspberries', 'Blackberries', 'Organic']
+  },
+  lettuce: {
+    category: 'Produce',
+    variants: ['Any', 'Iceberg', 'Romaine', 'Mixed Greens', 'Spinach', 'Organic']
   },
   tomatoes: {
     category: 'Produce',
-    variants: ['Any', 'Roma', 'Cherry', 'Beefsteak', 'Organic'],
+    variants: ['Any', 'Roma', 'Cherry', 'Grape', 'Heirloom', 'Organic']
   },
+  potatoes: {
+    category: 'Produce',
+    variants: ['Any', 'Russet', 'Red', 'Gold', 'Sweet', 'Organic']
+  },
+  onions: {
+    category: 'Produce',
+    variants: ['Any', 'Yellow', 'White', 'Red', 'Sweet', 'Organic']
+  },
+  carrots: {
+    category: 'Produce',
+    variants: ['Any', 'Baby', 'Regular', 'Organic']
+  },
+  broccoli: {
+    category: 'Produce',
+    variants: ['Any', 'Fresh', 'Frozen', 'Organic']
+  },
+
+  // Bakery
+  bread: {
+    category: 'Bakery',
+    variants: ['Any', 'White', 'Wheat', 'Whole Grain', 'Multigrain', 'Sourdough', 'Gluten-Free']
+  },
+  bagels: {
+    category: 'Bakery',
+    variants: ['Any', 'Plain', 'Everything', 'Whole Wheat', 'Cinnamon Raisin']
+  },
+  tortillas: {
+    category: 'Bakery',
+    variants: ['Any', 'Flour', 'Corn', 'Whole Wheat', 'Low-Carb']
+  },
+  rolls: {
+    category: 'Bakery',
+    variants: ['Any', 'Dinner', 'Hot Dog', 'Hamburger', 'Ciabatta']
+  },
+
+  // Breakfast
+  cereal: {
+    category: 'Breakfast',
+    variants: ['Any', 'Kids', 'Healthy', 'Granola', 'Oatmeal', 'High-Fiber']
+  },
+  oatmeal: {
+    category: 'Breakfast',
+    variants: ['Any', 'Quick', 'Steel-Cut', 'Instant', 'Flavored']
+  },
+  pancakes: {
+    category: 'Breakfast',
+    variants: ['Any', 'Mix', 'Frozen', 'Whole Grain', 'Gluten-Free']
+  },
+
+  // Beverages
+  juice: {
+    category: 'Beverages',
+    variants: ['Any', 'Orange', 'Apple', 'Grape', 'Cranberry', 'Pineapple', 'No Sugar Added']
+  },
+  soda: {
+    category: 'Beverages',
+    variants: ['Any', 'Cola', 'Lemon-Lime', 'Root Beer', 'Orange', 'Diet', 'Zero Sugar']
+  },
+  coffee: {
+    category: 'Beverages',
+    variants: ['Any', 'Ground', 'Whole Bean', 'K-Cups', 'Instant', 'Decaf']
+  },
+  tea: {
+    category: 'Beverages',
+    variants: ['Any', 'Black', 'Green', 'Herbal', 'Iced', 'Bags', 'Loose Leaf']
+  },
+  water: {
+    category: 'Beverages',
+    variants: ['Any', 'Bottled', 'Sparkling', 'Flavored', 'Gallon']
+  },
+
+  // Snacks
+  chips: {
+    category: 'Snacks',
+    variants: ['Any', 'Potato', 'Tortilla', 'Pita', 'Veggie', 'Baked', 'Kettle']
+  },
+  crackers: {
+    category: 'Snacks',
+    variants: ['Any', 'Saltines', 'Graham', 'Wheat', 'Cheese']
+  },
+  cookies: {
+    category: 'Snacks',
+    variants: ['Any', 'Chocolate Chip', 'Oreo', 'Graham', 'Sandwich']
+  },
+  popcorn: {
+    category: 'Snacks',
+    variants: ['Any', 'Microwave', 'Kernels', 'Ready-to-Eat', 'Butter', 'Caramel']
+  },
+
+  // Pantry
+  rice: {
+    category: 'Pantry',
+    variants: ['Any', 'White', 'Brown', 'Jasmine', 'Basmati', 'Instant']
+  },
+  pasta: {
+    category: 'Pantry',
+    variants: ['Any', 'Spaghetti', 'Penne', 'Macaroni', 'Whole Wheat', 'Gluten-Free']
+  },
+  sauce: {
+    category: 'Pantry',
+    variants: ['Any', 'Marinara', 'Alfredo', 'Tomato', 'Pesto', 'Soy']
+  },
+  soup: {
+    category: 'Pantry',
+    variants: ['Any', 'Chicken Noodle', 'Tomato', 'Vegetable', 'Cream of Mushroom']
+  },
+  beans: {
+    category: 'Pantry',
+    variants: ['Any', 'Black', 'Pinto', 'Kidney', 'Chickpeas', 'Refried', 'Canned', 'Dried']
+  },
+
+  // Frozen
+  pizza: {
+    category: 'Frozen',
+    variants: ['Any', 'Pepperoni', 'Cheese', 'Supreme', 'Thin Crust', 'Gluten-Free']
+  },
+  vegetables: {
+    category: 'Frozen',
+    variants: ['Any', 'Mixed', 'Broccoli', 'Peas', 'Corn', 'Green Beans', 'Organic']
+  },
+  'ice cream': {
+    category: 'Frozen',
+    variants: ['Any', 'Vanilla', 'Chocolate', 'Strawberry', 'Cookies & Cream', 'Low-Fat']
+  },
+
+  // Personal Care
+  toothpaste: {
+    category: 'Personal Care',
+    variants: ['Any', 'Whitening', 'Sensitive', 'Fluoride', 'Kids']
+  },
+  soap: {
+    category: 'Personal Care',
+    variants: ['Any', 'Bar', 'Body Wash', 'Hand Soap', 'Antibacterial', 'Moisturizing']
+  },
+  shampoo: {
+    category: 'Personal Care',
+    variants: ['Any', 'Regular', 'Dry Hair', 'Oily Hair', '2-in-1', 'Kids']
+  },
+
+  // Household
+  'paper towels': {
+    category: 'Household',
+    variants: ['Any', 'Select-A-Size', 'Mega Roll', 'Recycled']
+  },
+  'toilet paper': {
+    category: 'Household',
+    variants: ['Any', 'Double Roll', 'Mega Roll', 'Ultra Soft', 'Recycled']
+  },
+  detergent: {
+    category: 'Household',
+    variants: ['Any', 'Liquid', 'Pods', 'Powder', 'HE', 'Free & Clear']
+  }
 };
 
 interface SmartItemInputProps {

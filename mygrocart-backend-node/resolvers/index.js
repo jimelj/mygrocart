@@ -63,6 +63,16 @@ const generateToken = (userId) => {
   });
 };
 
+// Helper function to require admin access
+const requireAdmin = (user) => {
+  if (!user) {
+    throw new Error('Authentication required');
+  }
+  if (!user.isAdmin) {
+    throw new Error('Admin access required');
+  }
+};
+
 // Helper function to mock geocoding (in production, use Google Maps API)
 const mockGeocode = (address, city, state, zipCode) => {
   // Return NYC coordinates as default
@@ -86,6 +96,11 @@ const resolvers = {
     },
 
     searchProducts: async (_, { query, limit = 20, offset = 0 }, context) => {
+      // Authentication required
+      if (!context.user) {
+        throw new Error('Authentication required');
+      }
+
       try {
         const searchTerm = query.toLowerCase();
 
@@ -186,11 +201,22 @@ const resolvers = {
       }
     },
 
-    getProductByUpc: async (_, { upc }) => {
+    getProductByUpc: async (_, { upc }, { user }) => {
+      if (!user) {
+        throw new Error('Authentication required');
+      }
       return sampleData.products.find(product => product.upc === upc);
     },
 
-    getUserGroceryLists: async (_, { userId }) => {
+    getUserGroceryLists: async (_, { userId }, { user }) => {
+      // Authentication and authorization required
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+      if (user.userId !== userId) {
+        throw new Error('Unauthorized: Cannot access another user\'s shopping list');
+      }
+
       try {
         // Query database for user's shopping list items
         const UserList = require('../models/UserList');
@@ -213,11 +239,19 @@ const resolvers = {
       }
     },
 
-    comparePrices: async (_, { userId }) => {
+    comparePrices: async (_, { userId }, { user }) => {
+      // Authentication and authorization required
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+      if (user.userId !== userId) {
+        throw new Error('Unauthorized: Cannot compare prices for another user');
+      }
+
       try {
         // 1. Get user from database
-        const user = await User.findByPk(userId);
-        if (!user) throw new Error('User not found');
+        const dbUser = await User.findByPk(userId);
+        if (!dbUser) throw new Error('User not found');
 
         // 2. Get user's shopping list items from database
         const UserList = require('../models/UserList');
@@ -245,10 +279,10 @@ const resolvers = {
         // 4. Filter stores within travel radius
         const nearbyStores = allStores.filter(store => {
           const distance = calculateDistance(
-            user.latitude, user.longitude,
+            dbUser.latitude, dbUser.longitude,
             store.latitude, store.longitude
           );
-          return distance <= user.travelRadiusMiles;
+          return distance <= dbUser.travelRadiusMiles;
         });
 
         if (nearbyStores.length === 0) {
@@ -466,7 +500,10 @@ const resolvers = {
       }
     },
 
-    getStorePrices: async (_, { storeId, upcs }) => {
+    getStorePrices: async (_, { storeId, upcs }, { user }) => {
+      if (!user) {
+        throw new Error('Authentication required');
+      }
       return sampleData.storePrices
         .filter(price => price.storeId === storeId && upcs.includes(price.upc))
         .map(price => ({
@@ -900,11 +937,211 @@ const resolvers = {
     // ADMIN QUERIES
     // ===================================================================
 
+    // Admin stats query (expected by frontend)
+    getAdminStats: async (_, { zipCode }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        const where = {};
+        if (zipCode) {
+          where.zipCode = zipCode;
+        }
+
+        // Get total flyers count
+        const totalFlyers = await Flyer.count({ where });
+
+        // Get total deals count
+        const dealWhere = zipCode ? { zipCode } : {};
+        const totalDeals = await Deal.count({ where: dealWhere });
+
+        // Get processing jobs count (from queue status)
+        let processingJobs = 0;
+        try {
+          const queueStatus = await flyerQueue.getQueueStatus();
+          if (queueStatus.enabled && queueStatus.counts) {
+            processingJobs = queueStatus.counts.active + queueStatus.counts.waiting;
+          }
+        } catch (err) {
+          console.warn('[getAdminStats] Could not get queue status:', err.message);
+        }
+
+        // Get active stores (stores with valid flyers)
+        const activeStoresResult = await Flyer.findAll({
+          where: {
+            ...where,
+            validTo: { [Op.gte]: new Date() }
+          },
+          attributes: [[require('sequelize').fn('COUNT', require('sequelize').fn('DISTINCT', require('sequelize').col('storeName'))), 'count']],
+          raw: true
+        });
+        const activeStores = activeStoresResult[0]?.count || 0;
+
+        // Get flyers grouped by store
+        const flyersByStore = await Flyer.findAll({
+          where,
+          attributes: [
+            'storeName',
+            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+          ],
+          group: ['storeName'],
+          raw: true
+        });
+
+        // Get deals grouped by store
+        const dealsByStore = await Deal.findAll({
+          where: dealWhere,
+          attributes: [
+            'storeName',
+            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+          ],
+          group: ['storeName'],
+          raw: true
+        });
+
+        return {
+          totalFlyers,
+          totalDeals,
+          activeStores: parseInt(activeStores),
+          processingJobs,
+          lastRefreshTime: new Date().toISOString(),
+          flyersByStore: flyersByStore.map(f => ({ storeName: f.storeName, count: parseInt(f.count) })),
+          dealsByStore: dealsByStore.map(d => ({ storeName: d.storeName, count: parseInt(d.count) }))
+        };
+      } catch (error) {
+        console.error('[getAdminStats] Error:', error.message, error.stack);
+        throw new Error('Failed to fetch admin stats');
+      }
+    },
+
+    // Processing jobs query (expected by frontend)
+    getProcessingJobs: async (_, { status, limit = 50 }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        // Query FlyerQueue job history
+        const queueStatus = await flyerQueue.getQueueStatus();
+
+        if (!queueStatus.enabled) {
+          return [];
+        }
+
+        // Combine active, waiting, and recent history
+        const jobs = [];
+
+        // Active jobs
+        if (queueStatus.activeJobs) {
+          queueStatus.activeJobs.forEach(job => {
+            jobs.push({
+              id: job.id || `active-${job.zipCode}`,
+              type: 'flyer-fetch',
+              zipCode: job.zipCode,
+              status: 'processing',
+              errorMessage: null,
+              createdAt: job.addedAt || new Date().toISOString(),
+              completedAt: null
+            });
+          });
+        }
+
+        // Waiting jobs
+        if (queueStatus.waitingJobs) {
+          queueStatus.waitingJobs.forEach(job => {
+            jobs.push({
+              id: job.id || `waiting-${job.zipCode}`,
+              type: 'flyer-fetch',
+              zipCode: job.zipCode,
+              status: 'queued',
+              errorMessage: null,
+              createdAt: job.addedAt || new Date().toISOString(),
+              completedAt: null
+            });
+          });
+        }
+
+        // Recent history
+        if (queueStatus.recentHistory) {
+          queueStatus.recentHistory.forEach(job => {
+            jobs.push({
+              id: job.id || `history-${job.zipCode}`,
+              type: 'flyer-fetch',
+              zipCode: job.zipCode,
+              status: job.status,
+              errorMessage: job.result?.error || null,
+              createdAt: job.completedAt || new Date().toISOString(),
+              completedAt: job.completedAt
+            });
+          });
+        }
+
+        // Filter by status if requested
+        let filtered = jobs;
+        if (status) {
+          filtered = jobs.filter(j => j.status === status);
+        }
+
+        // Apply limit
+        return filtered.slice(0, limit);
+      } catch (error) {
+        console.error('[getProcessingJobs] Error:', error.message, error.stack);
+        return [];
+      }
+    },
+
+    // Get all flyers (expected by frontend with totalCount)
+    getAllFlyers: async (_, { zipCode, limit = 50, offset = 0 }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        const where = {};
+        if (zipCode) {
+          where.zipCode = zipCode;
+        }
+
+        const { count, rows } = await Flyer.findAndCountAll({
+          where,
+          include: [
+            { model: Store, as: 'store', required: false },
+            { model: Deal, as: 'deals', required: false }
+          ],
+          order: [['createdAt', 'DESC']],
+          limit,
+          offset
+        });
+
+        // Transform status to uppercase for GraphQL enum
+        const statusMap = {
+          'pending': 'PENDING',
+          'processing': 'PROCESSING',
+          'completed': 'COMPLETED',
+          'failed': 'FAILED'
+        };
+
+        const flyers = rows.map(flyer => {
+          const plainFlyer = flyer.get({ plain: true });
+          return {
+            ...plainFlyer,
+            status: statusMap[plainFlyer.status?.toLowerCase()] || 'COMPLETED',
+            dealCount: plainFlyer.deals?.length || 0,
+            processedAt: plainFlyer.updatedAt || plainFlyer.createdAt
+          };
+        });
+
+        return {
+          flyers,
+          totalCount: count
+        };
+      } catch (error) {
+        console.error('[getAllFlyers] Error:', error.message, error.stack);
+        return {
+          flyers: [],
+          totalCount: 0
+        };
+      }
+    },
+
     adminGetQueueStatus: async (_, __, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
 
         // Get queue status from FlyerQueue
         const status = await flyerQueue.getQueueStatus();
@@ -920,9 +1157,7 @@ const resolvers = {
 
     adminGetFlyerStats: async (_, { zipCode }, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
 
         const where = {};
         if (zipCode) {
@@ -973,9 +1208,7 @@ const resolvers = {
 
     adminGetAllFlyers: async (_, { zipCode, status, limit = 50, offset = 0 }, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
 
         const where = {};
         if (zipCode) {
@@ -1469,11 +1702,54 @@ const resolvers = {
     // ADMIN MUTATIONS
     // ===================================================================
 
+    // Frontend-compatible mutation (alias for adminTriggerFlyerFetch)
+    triggerFlyerFetch: async (_, { zipCode }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        // Check how many flyers exist for this ZIP already
+        const existingFlyers = await Flyer.count({
+          where: {
+            zipCode,
+            validTo: { [Op.gte]: new Date() }
+          }
+        });
+
+        // Add job to queue
+        const result = await flyerQueue.addJob(zipCode, {
+          triggeredBy: 'user',
+          priority: 'normal',
+          force: false // Don't force if recently processed
+        });
+
+        return {
+          jobId: result.jobId || '',
+          status: result.status,
+          message: result.message,
+          flyersFound: existingFlyers // Current count
+        };
+      } catch (error) {
+        console.error('[triggerFlyerFetch] Error:', error.message, error.stack);
+        return {
+          jobId: '',
+          status: 'error',
+          message: error.message,
+          flyersFound: 0
+        };
+      }
+    },
+
     adminTriggerFlyerFetch: async (_, { zipCode, priority = 'normal' }, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
+
+        // Check how many flyers exist for this ZIP already
+        const existingFlyers = await Flyer.count({
+          where: {
+            zipCode,
+            validTo: { [Op.gte]: new Date() }
+          }
+        });
 
         // Add job to queue
         const result = await flyerQueue.addJob(zipCode, {
@@ -1486,7 +1762,8 @@ const resolvers = {
           success: result.success,
           status: result.status,
           jobId: result.jobId || null,
-          message: result.message
+          message: result.message,
+          flyersFound: existingFlyers
         };
       } catch (error) {
         console.error('[adminTriggerFlyerFetch] Error:', error.message, error.stack);
@@ -1494,16 +1771,15 @@ const resolvers = {
           success: false,
           status: 'error',
           jobId: null,
-          message: error.message
+          message: error.message,
+          flyersFound: 0
         };
       }
     },
 
     adminClearFlyersForZip: async (_, { zipCode }, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
 
         // Validate ZIP code
         if (!zipCode || !/^\d{5}$/.test(zipCode)) {
@@ -1544,9 +1820,7 @@ const resolvers = {
     // Trigger weekly refresh for all user ZIP codes
     adminTriggerWeeklyRefresh: async (_, __, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
 
         console.log('[adminTriggerWeeklyRefresh] Manually triggering weekly refresh...');
 
@@ -1572,9 +1846,7 @@ const resolvers = {
     // Refresh flyers that are expiring soon
     adminRefreshExpiringFlyers: async (_, __, { user }) => {
       try {
-        if (!user) {
-          throw new Error('Authentication required');
-        }
+        requireAdmin(user);
 
         console.log('[adminRefreshExpiringFlyers] Checking for expiring flyers...');
 

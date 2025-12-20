@@ -237,6 +237,8 @@ const typeDefs = gql`
     imageUrls: [String!]!
     status: FlyerStatus!
     deals: [Deal!]!
+    dealCount: Int
+    processedAt: String
     createdAt: String!
   }
 
@@ -453,6 +455,9 @@ const typeDefs = gql`
     # ADMIN MUTATIONS (Flyer Queue Management)
     # ===================================================================
 
+    # Trigger flyer fetch (frontend-compatible name)
+    triggerFlyerFetch(zipCode: String!): FlyerFetchResult!
+
     # Trigger flyer fetch for a ZIP code (admin only)
     adminTriggerFlyerFetch(zipCode: String!, priority: String): FlyerJobResult!
 
@@ -482,6 +487,39 @@ const typeDefs = gql`
     status: String!
     jobId: String
     message: String!
+    flyersFound: Int
+  }
+
+  type FlyerFetchResult {
+    jobId: String!
+    status: String!
+    message: String!
+    flyersFound: Int!
+  }
+
+  type FlyerConnection {
+    flyers: [Flyer!]!
+    totalCount: Int!
+  }
+
+  type ProcessingJob {
+    id: ID!
+    type: String!
+    zipCode: String!
+    status: String!
+    errorMessage: String
+    createdAt: String!
+    completedAt: String
+  }
+
+  type AdminStats {
+    totalFlyers: Int!
+    totalDeals: Int!
+    activeStores: Int!
+    processingJobs: Int!
+    lastRefreshTime: String
+    flyersByStore: [StoreFlyerCount!]!
+    dealsByStore: [StoreDealCount!]!
   }
 
   type AdminActionResult {
@@ -545,7 +583,12 @@ const typeDefs = gql`
   }
 
   extend type Query {
-    # Admin queries (requires isAdmin: true)
+    # Admin queries (frontend-compatible names)
+    getAdminStats(zipCode: String): AdminStats!
+    getProcessingJobs(status: String, limit: Int): [ProcessingJob!]!
+    getAllFlyers(zipCode: String, limit: Int, offset: Int): FlyerConnection!
+
+    # Admin queries (backend names for compatibility)
     adminGetQueueStatus: FlyerQueueStatus!
     adminGetFlyerStats(zipCode: String): FlyerStats!
     adminGetAllFlyers(zipCode: String, status: String, limit: Int, offset: Int): [Flyer!]!
