@@ -267,11 +267,31 @@ export default function FlyersPage() {
             ))}
 
             {!loading && flyers.length === 0 && (
-              <div className="col-span-full text-center py-12">
-                <p className="text-gray-500">No flyers available for your area yet.</p>
-                <p className="text-sm text-gray-400 mt-2">
-                  Check back soon - we update flyers weekly!
+              <div className="col-span-full bg-white rounded-lg p-12 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <Newspaper className="w-16 h-16 text-blue-200" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Welcome to MyGroCart! 🎉
+                </h3>
+                <p className="text-gray-600 mb-2">
+                  We&apos;re setting up your personalized deals experience.
                 </p>
+                <p className="text-gray-600 mb-2">
+                  Currently fetching the latest weekly flyers for ZIP code <strong>{zipCode}</strong>.
+                </p>
+                <p className="text-gray-500 text-sm mb-6">
+                  This usually takes less than a minute. Please refresh in a moment!
+                </p>
+                <Button
+                  onClick={() => window.location.reload()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Refresh Page
+                </Button>
               </div>
             )}
           </div>

@@ -280,23 +280,55 @@ export default function DealsPage() {
           </div>
         )}
 
-        {/* Empty state */}
+        {/* Empty state - check if filters are applied or if we have no data at all */}
         {!loading && !error && sortedDeals.length === 0 && (
           <div className="bg-white rounded-lg p-12 text-center">
-            <Filter className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No deals found
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Try adjusting your filters or search query
-            </p>
-            <Button onClick={() => {
-              setSearchQuery('');
-              setSelectedCategory('All');
-              setSelectedStore('All Stores');
-            }}>
-              Clear Filters
-            </Button>
+            {/* Check if user has any filters applied */}
+            {searchQuery || selectedCategory !== 'All' || selectedStore !== 'All Stores' ? (
+              <>
+                <Filter className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No deals found
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Try adjusting your filters or search query
+                </p>
+                <Button onClick={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('All');
+                  setSelectedStore('All Stores');
+                }}>
+                  Clear Filters
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <Tag className="w-16 h-16 text-green-200" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-green-500 border-t-transparent"></div>
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Welcome to MyGroCart! 🎉
+                </h3>
+                <p className="text-gray-600 mb-2">
+                  We&apos;re setting up your personalized deals experience.
+                </p>
+                <p className="text-gray-600 mb-2">
+                  Currently fetching the latest deals for ZIP code <strong>{zipCode}</strong>.
+                </p>
+                <p className="text-gray-500 text-sm mb-6">
+                  This usually takes less than a minute. Please refresh in a moment!
+                </p>
+                <Button
+                  onClick={() => window.location.reload()}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Refresh Page
+                </Button>
+              </>
+            )}
           </div>
         )}
 
