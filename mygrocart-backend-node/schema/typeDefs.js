@@ -448,6 +448,94 @@ const typeDefs = gql`
 
     # Notification mutations
     markNotificationRead(notificationId: ID!): UserNotification!
+
+    # ===================================================================
+    # ADMIN MUTATIONS (Flyer Queue Management)
+    # ===================================================================
+
+    # Trigger flyer fetch for a ZIP code (admin only)
+    adminTriggerFlyerFetch(zipCode: String!, priority: String): FlyerJobResult!
+
+    # Clear all flyers for a ZIP code (admin only)
+    adminClearFlyersForZip(zipCode: String!): AdminActionResult!
+  }
+
+  # ===================================================================
+  # ADMIN TYPES (Flyer Queue Management)
+  # ===================================================================
+
+  type FlyerJobResult {
+    success: Boolean!
+    status: String!
+    jobId: String
+    message: String!
+  }
+
+  type AdminActionResult {
+    success: Boolean!
+    message: String!
+    affectedCount: Int
+  }
+
+  type FlyerQueueJob {
+    id: String!
+    zipCode: String!
+    triggeredBy: String!
+    addedAt: String
+    startedAt: String
+  }
+
+  type FlyerQueueCounts {
+    waiting: Int!
+    active: Int!
+    completed: Int!
+    failed: Int!
+  }
+
+  type FlyerJobHistory {
+    id: String!
+    zipCode: String!
+    triggeredBy: String!
+    status: String!
+    flyersProcessed: Int
+    newFlyers: Int
+    totalDeals: Int
+    completedAt: String!
+  }
+
+  type FlyerQueueStatus {
+    enabled: Boolean!
+    message: String
+    counts: FlyerQueueCounts
+    activeJobs: [FlyerQueueJob!]
+    waitingJobs: [FlyerQueueJob!]
+    recentHistory: [FlyerJobHistory!]
+    processingZips: [String!]
+  }
+
+  type FlyerStats {
+    totalFlyers: Int!
+    totalDeals: Int!
+    flyersByStore: [StoreFlyerCount!]!
+    dealsByStore: [StoreDealCount!]!
+    lastRefreshTime: String
+  }
+
+  type StoreFlyerCount {
+    storeName: String!
+    count: Int!
+  }
+
+  type StoreDealCount {
+    storeName: String!
+    count: Int!
+  }
+
+  extend type Query {
+    # Admin queries (requires isAdmin: true)
+    adminGetQueueStatus: FlyerQueueStatus!
+    adminGetFlyerStats(zipCode: String): FlyerStats!
+    adminGetAllFlyers(zipCode: String, status: String, limit: Int, offset: Int): [Flyer!]!
   }
 
   # Price Discovery Types

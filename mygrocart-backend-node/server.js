@@ -26,6 +26,7 @@ const { connectDB } = require('./config/database');
 // Import Redis configuration
 const { initializeRedis, closeRedis, getCacheStats } = require('./config/redis');
 const cacheService = require('./services/CacheService');
+const flyerQueue = require('./services/FlyerQueue');
 
 // Import all models to ensure associations are set up
 const models = require('./models');
@@ -146,8 +147,15 @@ async function startServer() {
     if (redisClient) {
       await cacheService.initialize();
       console.log('Redis cache initialized successfully');
+
+      // Initialize flyer processing queue (requires Redis)
+      const queueReady = await flyerQueue.initialize();
+      if (queueReady) {
+        console.log('Flyer processing queue initialized successfully');
+      }
     } else {
       console.log('Redis not configured - caching disabled (application will continue without cache)');
+      console.log('Flyer queue will use direct processing mode');
     }
   } catch (error) {
     console.log('Redis initialization failed - caching disabled:', error.message);
@@ -167,12 +175,14 @@ async function startServer() {
 // Handle graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
+  await flyerQueue.close();
   await closeRedis();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
+  await flyerQueue.close();
   await closeRedis();
   process.exit(0);
 });

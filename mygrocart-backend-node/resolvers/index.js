@@ -16,10 +16,11 @@ const discoveryService = new DynamicPriceDiscoveryService();
 const ProgressiveDiscoveryService = require('../services/ProgressiveDiscoveryService');
 const progressiveDiscoveryService = new ProgressiveDiscoveryService();
 const FlyerService = require('../services/FlyerService');
+const flyerQueue = require('../services/FlyerQueue');
 
 /**
  * Check if flyers exist for a ZIP code, and fetch them if not.
- * Runs in the background (non-blocking) so signup/login stays fast.
+ * Uses the job queue for controlled processing (non-blocking).
  * @param {string} zipCode - The ZIP code to check
  */
 async function ensureFlyersForZip(zipCode) {
@@ -39,22 +40,16 @@ async function ensureFlyersForZip(zipCode) {
       return;
     }
 
-    // No flyers for this ZIP - fetch them in the background
-    console.log(`[ensureFlyersForZip] No flyers for ZIP ${zipCode}, triggering background fetch...`);
+    // No flyers for this ZIP - add to queue for processing
+    console.log(`[ensureFlyersForZip] No flyers for ZIP ${zipCode}, adding to processing queue...`);
 
-    const flyerService = new FlyerService();
+    // Add job to queue (non-blocking, returns immediately)
+    const result = await flyerQueue.addJob(zipCode, {
+      triggeredBy: 'user-auth',
+      priority: 'normal'
+    });
 
-    // Run in background (don't await) so signup/login returns immediately
-    flyerService.processZipCode(zipCode)
-      .then(result => {
-        console.log(`[ensureFlyersForZip] ZIP ${zipCode} fetch complete:`, {
-          newFlyers: result.newFlyers,
-          totalDeals: result.totalDeals
-        });
-      })
-      .catch(error => {
-        console.error(`[ensureFlyersForZip] ZIP ${zipCode} fetch failed:`, error.message);
-      });
+    console.log(`[ensureFlyersForZip] ZIP ${zipCode} queue status: ${result.status} - ${result.message}`);
 
   } catch (error) {
     console.error(`[ensureFlyersForZip] Error checking flyers for ZIP ${zipCode}:`, error.message);
@@ -899,6 +894,127 @@ const resolvers = {
         // Return generic error to client
         return [];
       }
+    },
+
+    // ===================================================================
+    // ADMIN QUERIES
+    // ===================================================================
+
+    adminGetQueueStatus: async (_, __, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        // Get queue status from FlyerQueue
+        const status = await flyerQueue.getQueueStatus();
+        return status;
+      } catch (error) {
+        console.error('[adminGetQueueStatus] Error:', error.message);
+        return {
+          enabled: false,
+          message: error.message
+        };
+      }
+    },
+
+    adminGetFlyerStats: async (_, { zipCode }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const where = {};
+        if (zipCode) {
+          where.zipCode = zipCode;
+        }
+
+        // Get total flyers count
+        const totalFlyers = await Flyer.count({ where });
+
+        // Get total deals count
+        const dealWhere = zipCode ? { zipCode } : {};
+        const totalDeals = await Deal.count({ where: dealWhere });
+
+        // Get flyers grouped by store
+        const flyersByStore = await Flyer.findAll({
+          where,
+          attributes: [
+            'storeName',
+            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+          ],
+          group: ['storeName'],
+          raw: true
+        });
+
+        // Get deals grouped by store
+        const dealsByStore = await Deal.findAll({
+          where: dealWhere,
+          attributes: [
+            'storeName',
+            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+          ],
+          group: ['storeName'],
+          raw: true
+        });
+
+        return {
+          totalFlyers,
+          totalDeals,
+          flyersByStore: flyersByStore.map(f => ({ storeName: f.storeName, count: parseInt(f.count) })),
+          dealsByStore: dealsByStore.map(d => ({ storeName: d.storeName, count: parseInt(d.count) })),
+          lastRefreshTime: new Date().toISOString()
+        };
+      } catch (error) {
+        console.error('[adminGetFlyerStats] Error:', error.message, error.stack);
+        throw new Error('Failed to fetch flyer stats');
+      }
+    },
+
+    adminGetAllFlyers: async (_, { zipCode, status, limit = 50, offset = 0 }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        const where = {};
+        if (zipCode) {
+          where.zipCode = zipCode;
+        }
+        if (status) {
+          where.status = status.toLowerCase();
+        }
+
+        const flyers = await Flyer.findAll({
+          where,
+          include: [
+            { model: Store, as: 'store', required: false },
+            { model: Deal, as: 'deals', required: false }
+          ],
+          order: [['createdAt', 'DESC']],
+          limit,
+          offset
+        });
+
+        // Transform status to uppercase for GraphQL enum
+        const statusMap = {
+          'pending': 'PENDING',
+          'processing': 'PROCESSING',
+          'completed': 'COMPLETED',
+          'failed': 'FAILED'
+        };
+
+        return flyers.map(flyer => {
+          const plainFlyer = flyer.get({ plain: true });
+          return {
+            ...plainFlyer,
+            status: statusMap[plainFlyer.status?.toLowerCase()] || 'COMPLETED'
+          };
+        });
+      } catch (error) {
+        console.error('[adminGetAllFlyers] Error:', error.message, error.stack);
+        return [];
+      }
     }
   },
 
@@ -1346,6 +1462,82 @@ const resolvers = {
 
         // Return generic error to client
         throw new Error('Failed to mark notification as read. Please try again.');
+      }
+    },
+
+    // ===================================================================
+    // ADMIN MUTATIONS
+    // ===================================================================
+
+    adminTriggerFlyerFetch: async (_, { zipCode, priority = 'normal' }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        // Add job to queue
+        const result = await flyerQueue.addJob(zipCode, {
+          triggeredBy: 'admin',
+          priority,
+          force: true // Force reprocessing even if recently done
+        });
+
+        return {
+          success: result.success,
+          status: result.status,
+          jobId: result.jobId || null,
+          message: result.message
+        };
+      } catch (error) {
+        console.error('[adminTriggerFlyerFetch] Error:', error.message, error.stack);
+        return {
+          success: false,
+          status: 'error',
+          jobId: null,
+          message: error.message
+        };
+      }
+    },
+
+    adminClearFlyersForZip: async (_, { zipCode }, { user }) => {
+      try {
+        if (!user) {
+          throw new Error('Authentication required');
+        }
+
+        // Validate ZIP code
+        if (!zipCode || !/^\d{5}$/.test(zipCode)) {
+          return {
+            success: false,
+            message: 'Invalid ZIP code format',
+            affectedCount: 0
+          };
+        }
+
+        // Delete deals for this ZIP code first (due to foreign key)
+        const deletedDeals = await Deal.destroy({
+          where: { zipCode }
+        });
+
+        // Delete flyers for this ZIP code
+        const deletedFlyers = await Flyer.destroy({
+          where: { zipCode }
+        });
+
+        console.log(`[adminClearFlyersForZip] Deleted ${deletedFlyers} flyers and ${deletedDeals} deals for ZIP ${zipCode}`);
+
+        return {
+          success: true,
+          message: `Cleared ${deletedFlyers} flyers and ${deletedDeals} deals for ZIP ${zipCode}`,
+          affectedCount: deletedFlyers + deletedDeals
+        };
+      } catch (error) {
+        console.error('[adminClearFlyersForZip] Error:', error.message, error.stack);
+        return {
+          success: false,
+          message: error.message,
+          affectedCount: 0
+        };
       }
     }
   },

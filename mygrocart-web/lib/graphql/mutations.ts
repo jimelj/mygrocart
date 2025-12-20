@@ -60,3 +60,37 @@ export const REMOVE_LIST_ITEM = gql`
     removeListItem(id: $id)
   }
 `;
+
+// ===================================
+// ADMIN DASHBOARD MUTATIONS
+// ===================================
+
+// Trigger flyer fetch for a ZIP code
+export const TRIGGER_FLYER_FETCH = gql`
+  mutation TriggerFlyerFetch($zipCode: String!) {
+    triggerFlyerFetch(zipCode: $zipCode) {
+      jobId
+      status
+      message
+      flyersFound
+    }
+  }
+`;
+
+// Trigger flyer reprocessing
+export const TRIGGER_FLYER_REPROCESS = gql`
+  mutation TriggerFlyerReprocess($flyerId: ID!) {
+    triggerFlyerReprocess(flyerId: $flyerId) {
+      jobId
+      status
+      message
+    }
+  }
+`;
+
+// Delete flyer
+export const DELETE_FLYER = gql`
+  mutation DeleteFlyer($flyerId: ID!) {
+    deleteFlyer(flyerId: $flyerId)
+  }
+`;

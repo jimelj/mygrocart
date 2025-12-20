@@ -431,3 +431,86 @@ export const GET_FLYER = gql`
     }
   }
 `;
+
+// ===================================
+// ADMIN DASHBOARD QUERIES
+// ===================================
+
+// Get admin statistics
+export const GET_ADMIN_STATS = gql`
+  query GetAdminStats($zipCode: String) {
+    getAdminStats(zipCode: $zipCode) {
+      totalFlyers
+      totalDeals
+      activeStores
+      processingJobs
+      lastRefreshTime
+      flyersByStore {
+        storeName
+        count
+      }
+      dealsByStore {
+        storeName
+        count
+      }
+    }
+  }
+`;
+
+// Get processing jobs
+export const GET_PROCESSING_JOBS = gql`
+  query GetProcessingJobs($status: String, $limit: Int) {
+    getProcessingJobs(status: $status, limit: $limit) {
+      id
+      type
+      zipCode
+      status
+      errorMessage
+      createdAt
+      completedAt
+    }
+  }
+`;
+
+// Get all flyers with pagination
+export const GET_ALL_FLYERS = gql`
+  query GetAllFlyers($zipCode: String, $limit: Int, $offset: Int) {
+    getAllFlyers(zipCode: $zipCode, limit: $limit, offset: $offset) {
+      flyers {
+        id
+        storeName
+        storeSlug
+        flyerName
+        zipCode
+        imageUrls
+        validFrom
+        validTo
+        status
+        dealCount
+        processedAt
+      }
+      totalCount
+    }
+  }
+`;
+
+// Get flyer details
+export const GET_FLYER_DETAILS = gql`
+  query GetFlyerDetails($flyerId: ID!) {
+    getFlyerDetails(flyerId: $flyerId) {
+      id
+      storeName
+      flyerName
+      imageUrls
+      validFrom
+      validTo
+      status
+      deals {
+        id
+        productName
+        salePrice
+        dealType
+      }
+    }
+  }
+`;
