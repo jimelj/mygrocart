@@ -960,6 +960,14 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
       });
 
       if (existingFlyer) {
+        // Update zipCode if it's different (fix for flyers saved with wrong ZIP)
+        const newZipCode = (flyerData.postal_code || '').trim().replace(/[^0-9]/g, '').substring(0, 10);
+        if (newZipCode && existingFlyer.zipCode !== newZipCode) {
+          await existingFlyer.update({ zipCode: newZipCode }, { transaction });
+          await transaction.commit();
+          console.log(`[FlyerService] Updated flyer ${flyerData.flyer_run_id} ZIP from ${existingFlyer.zipCode} to ${newZipCode}`);
+          return existingFlyer;
+        }
         await transaction.rollback();
         console.log(`[FlyerService] Flyer ${flyerData.flyer_run_id} already exists - skipping`);
         return existingFlyer;
