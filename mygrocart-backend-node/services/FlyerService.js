@@ -1172,6 +1172,163 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
   }
 
   /**
+   * Check for missing flyers and complete interrupted fetches
+   * Compares available flyers from API with stored flyers in database
+   *
+   * @param {string} zipCode - 5-digit ZIP code
+   * @returns {Promise<object>} Status report including missing flyers count
+   */
+  async checkAndCompleteFlyersForZip(zipCode) {
+    try {
+      console.log(`[FlyerService] Checking for missing flyers in ZIP ${zipCode}...`);
+
+      // Step 1: Fetch all available flyers from API
+      const allFlyers = await this.fetchFlyersForZip(zipCode);
+      const groceryFlyers = this.filterGroceryStores(allFlyers);
+
+      if (groceryFlyers.length === 0) {
+        return {
+          success: true,
+          zipCode,
+          availableFromApi: 0,
+          storedInDb: 0,
+          missingCount: 0,
+          message: 'No grocery flyers available for this ZIP code'
+        };
+      }
+
+      // Step 2: Get stored flyer run IDs from database
+      const storedFlyers = await Flyer.findAll({
+        where: { zipCode },
+        attributes: ['flyerRunId', 'storeName', 'status']
+      });
+
+      const storedRunIds = new Set(storedFlyers.map(f => f.flyerRunId));
+
+      // Step 3: Find missing flyers (in API but not in DB)
+      const missingFlyers = groceryFlyers.filter(f => !storedRunIds.has(f.flyer_run_id));
+
+      console.log(`[FlyerService] ZIP ${zipCode}: API has ${groceryFlyers.length}, DB has ${storedFlyers.length}, missing ${missingFlyers.length}`);
+
+      if (missingFlyers.length === 0) {
+        return {
+          success: true,
+          zipCode,
+          availableFromApi: groceryFlyers.length,
+          storedInDb: storedFlyers.length,
+          missingCount: 0,
+          message: 'All flyers are up to date'
+        };
+      }
+
+      // Step 4: Process missing flyers
+      let newFlyers = 0;
+      let totalDeals = 0;
+      const errors = [];
+
+      for (const flyerData of missingFlyers) {
+        try {
+          console.log(`[FlyerService] Processing missing flyer: ${flyerData.merchant} (${flyerData.flyer_run_id})`);
+
+          // Download images
+          const imageUrls = await this.downloadFlyerImages(flyerData);
+
+          // Upload to Cloudinary
+          const cloudinaryUrls = await this.uploadToCloudinary(imageUrls, flyerData.flyer_run_id);
+
+          // Extract deals with OCR
+          const deals = await this.extractDealsWithOCR(cloudinaryUrls);
+
+          // Enrich deals with product images
+          const enrichedDeals = await this.enrichDealsWithImages(deals);
+
+          // Save to database
+          await this.saveFlyer({
+            ...flyerData,
+            imageUrls: cloudinaryUrls,
+            flyerPath: this.parseFlyerPath(flyerData)
+          }, enrichedDeals);
+
+          newFlyers++;
+          totalDeals += deals.length;
+
+          // Rate limiting
+          await this.delay(this.requestDelay);
+        } catch (error) {
+          console.error(`[FlyerService] Error processing missing flyer ${flyerData.merchant}:`, error.message);
+          errors.push({ store: flyerData.merchant, error: error.message });
+        }
+      }
+
+      const finalStoredCount = storedFlyers.length + newFlyers;
+
+      return {
+        success: true,
+        zipCode,
+        availableFromApi: groceryFlyers.length,
+        storedInDb: finalStoredCount,
+        missingCount: missingFlyers.length,
+        newFlyersProcessed: newFlyers,
+        newDeals: totalDeals,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `Completed ${newFlyers}/${missingFlyers.length} missing flyers with ${totalDeals} deals`
+      };
+    } catch (error) {
+      console.error(`[FlyerService] Error checking flyers for ZIP ${zipCode}:`, error.message);
+      return {
+        success: false,
+        zipCode,
+        availableFromApi: 0,
+        storedInDb: 0,
+        missingCount: 0,
+        message: error.message
+      };
+    }
+  }
+
+  /**
+   * Get flyer status for a ZIP code (API count vs DB count)
+   * Fast method that only checks counts without processing
+   *
+   * @param {string} zipCode - 5-digit ZIP code
+   * @returns {Promise<object>} Status report
+   */
+  async getFlyerStatusForZip(zipCode) {
+    try {
+      // Fetch from API
+      const allFlyers = await this.fetchFlyersForZip(zipCode);
+      const groceryFlyers = this.filterGroceryStores(allFlyers);
+
+      // Count in database
+      const storedCount = await Flyer.count({
+        where: { zipCode }
+      });
+
+      const missingCount = Math.max(0, groceryFlyers.length - storedCount);
+      const isComplete = missingCount === 0;
+
+      return {
+        zipCode,
+        availableFromApi: groceryFlyers.length,
+        storedInDb: storedCount,
+        missingCount,
+        isComplete,
+        stores: groceryFlyers.map(f => f.merchant)
+      };
+    } catch (error) {
+      console.error(`[FlyerService] Error getting flyer status for ZIP ${zipCode}:`, error.message);
+      return {
+        zipCode,
+        availableFromApi: 0,
+        storedInDb: 0,
+        missingCount: 0,
+        isComplete: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Helper: Delay execution for rate limiting
    * @param {number} ms - Milliseconds to delay
    * @returns {Promise<void>}

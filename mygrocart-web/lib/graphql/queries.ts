@@ -135,6 +135,7 @@ export const SIGNUP = gql`
         email
         name
         zipCode
+        isAdmin
       }
     }
   }
@@ -152,6 +153,7 @@ export const LOGIN = gql`
         state
         zipCode
         travelRadiusMiles
+        isAdmin
       }
     }
   }

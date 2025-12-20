@@ -382,6 +382,34 @@ export default function AdminDashboard() {
     );
   }
 
+  // Not an admin
+  if (!user?.isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-center justify-center">
+              <XCircle className="h-6 w-6 text-red-600" />
+              Admin Access Required
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Alert variant="destructive">
+              <AlertDescription>
+                This page is only accessible to administrators.
+              </AlertDescription>
+            </Alert>
+            <div className="mt-6">
+              <Button asChild className="bg-green-600 hover:bg-green-700">
+                <Link href="/">Go Home</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

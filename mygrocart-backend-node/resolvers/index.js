@@ -16,6 +16,7 @@ const discoveryService = new DynamicPriceDiscoveryService();
 const ProgressiveDiscoveryService = require('../services/ProgressiveDiscoveryService');
 const progressiveDiscoveryService = new ProgressiveDiscoveryService();
 const FlyerService = require('../services/FlyerService');
+const flyerService = new FlyerService();
 const flyerQueue = require('../services/FlyerQueue');
 
 /**
@@ -35,21 +36,40 @@ async function ensureFlyersForZip(zipCode) {
       }
     });
 
-    if (existingFlyers > 0) {
-      console.log(`[ensureFlyersForZip] ZIP ${zipCode} already has ${existingFlyers} active flyers, skipping fetch`);
+    if (existingFlyers === 0) {
+      // No flyers for this ZIP - add to queue for processing
+      console.log(`[ensureFlyersForZip] No flyers for ZIP ${zipCode}, adding to processing queue...`);
+
+      const result = await flyerQueue.addJob(zipCode, {
+        triggeredBy: 'user-auth',
+        priority: 'normal'
+      });
+
+      console.log(`[ensureFlyersForZip] ZIP ${zipCode} queue status: ${result.status} - ${result.message}`);
       return;
     }
 
-    // No flyers for this ZIP - add to queue for processing
-    console.log(`[ensureFlyersForZip] No flyers for ZIP ${zipCode}, adding to processing queue...`);
+    // We have some flyers - check if there are missing ones (interrupted fetch)
+    console.log(`[ensureFlyersForZip] ZIP ${zipCode} has ${existingFlyers} active flyers, checking for missing...`);
 
-    // Add job to queue (non-blocking, returns immediately)
-    const result = await flyerQueue.addJob(zipCode, {
-      triggeredBy: 'user-auth',
-      priority: 'normal'
+    // Run the completion check in the background (non-blocking)
+    setImmediate(async () => {
+      try {
+        const status = await flyerService.getFlyerStatusForZip(zipCode);
+
+        if (status.missingCount > 0) {
+          console.log(`[ensureFlyersForZip] ZIP ${zipCode} has ${status.missingCount} missing flyers (${status.storedInDb}/${status.availableFromApi}), triggering completion...`);
+
+          // Use checkAndCompleteFlyersForZip to fetch missing flyers
+          const result = await flyerService.checkAndCompleteFlyersForZip(zipCode);
+          console.log(`[ensureFlyersForZip] Completion result for ZIP ${zipCode}: ${result.message}`);
+        } else {
+          console.log(`[ensureFlyersForZip] ZIP ${zipCode} has all ${status.storedInDb} flyers, no action needed`);
+        }
+      } catch (completionError) {
+        console.error(`[ensureFlyersForZip] Completion check failed for ZIP ${zipCode}:`, completionError.message);
+      }
     });
-
-    console.log(`[ensureFlyersForZip] ZIP ${zipCode} queue status: ${result.status} - ${result.message}`);
 
   } catch (error) {
     console.error(`[ensureFlyersForZip] Error checking flyers for ZIP ${zipCode}:`, error.message);
@@ -1351,6 +1371,46 @@ const resolvers = {
       }
     },
 
+    // Check flyer completion status for a ZIP code
+    getFlyerCompletionStatus: async (_, { zipCode }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        // Validate ZIP code
+        if (!zipCode || !/^\d{5}$/.test(zipCode)) {
+          return {
+            zipCode: zipCode || '',
+            availableFromApi: 0,
+            storedInDb: 0,
+            missingCount: 0,
+            isComplete: true,
+            stores: []
+          };
+        }
+
+        const result = await flyerService.getFlyerStatusForZip(zipCode);
+
+        return {
+          zipCode: result.zipCode,
+          availableFromApi: result.availableFromApi || 0,
+          storedInDb: result.storedInDb || 0,
+          missingCount: result.missingCount || 0,
+          isComplete: result.isComplete !== false,
+          stores: result.stores || []
+        };
+      } catch (error) {
+        console.error('[getFlyerCompletionStatus] Error:', error.message, error.stack);
+        return {
+          zipCode,
+          availableFromApi: 0,
+          storedInDb: 0,
+          missingCount: 0,
+          isComplete: true,
+          stores: []
+        };
+      }
+    },
+
     adminGetQueueStatus: async (_, __, { user }) => {
       try {
         requireAdmin(user);
@@ -2077,6 +2137,50 @@ const resolvers = {
           message: error.message,
           zipsQueued: 0,
           totalZips: 0
+        };
+      }
+    },
+
+    // Complete missing flyers for a ZIP code
+    completeMissingFlyers: async (_, { zipCode }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        // Validate ZIP code
+        if (!zipCode || !/^\d{5}$/.test(zipCode)) {
+          return {
+            success: false,
+            zipCode: zipCode || '',
+            availableFromApi: 0,
+            storedInDb: 0,
+            missingCount: 0,
+            message: 'Invalid ZIP code format'
+          };
+        }
+
+        console.log(`[completeMissingFlyers] Checking and completing flyers for ZIP ${zipCode}...`);
+
+        const result = await flyerService.checkAndCompleteFlyersForZip(zipCode);
+
+        return {
+          success: result.success,
+          zipCode: result.zipCode,
+          availableFromApi: result.availableFromApi || 0,
+          storedInDb: result.storedInDb || 0,
+          missingCount: result.missingCount || 0,
+          newFlyersProcessed: result.newFlyersProcessed || 0,
+          newDeals: result.newDeals || 0,
+          message: result.message
+        };
+      } catch (error) {
+        console.error('[completeMissingFlyers] Error:', error.message, error.stack);
+        return {
+          success: false,
+          zipCode,
+          availableFromApi: 0,
+          storedInDb: 0,
+          missingCount: 0,
+          message: error.message
         };
       }
     }

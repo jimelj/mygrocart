@@ -503,6 +503,29 @@ const typeDefs = gql`
 
     # Refresh flyers that are expiring soon (admin only)
     adminRefreshExpiringFlyers: WeeklyRefreshResult!
+
+    # Complete missing flyers for a ZIP code (admin only)
+    completeMissingFlyers(zipCode: String!): FlyerCompletionResult!
+  }
+
+  type FlyerCompletionResult {
+    success: Boolean!
+    zipCode: String!
+    availableFromApi: Int!
+    storedInDb: Int!
+    missingCount: Int!
+    newFlyersProcessed: Int
+    newDeals: Int
+    message: String!
+  }
+
+  type FlyerStatusResult {
+    zipCode: String!
+    availableFromApi: Int!
+    storedInDb: Int!
+    missingCount: Int!
+    isComplete: Boolean!
+    stores: [String!]
   }
 
   type WeeklyRefreshResult {
@@ -621,6 +644,9 @@ const typeDefs = gql`
     getAdminStats(zipCode: String): AdminStats!
     getProcessingJobs(status: String, limit: Int): [ProcessingJob!]!
     getAllFlyers(zipCode: String, limit: Int, offset: Int): FlyerConnection!
+
+    # Check flyer completion status (admin only)
+    getFlyerCompletionStatus(zipCode: String!): FlyerStatusResult!
 
     # Admin queries (backend names for compatibility)
     adminGetQueueStatus: FlyerQueueStatus!
