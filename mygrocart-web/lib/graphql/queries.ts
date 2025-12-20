@@ -425,6 +425,34 @@ export const SEARCH_DEALS = gql`
   }
 `;
 
+// Store deals ranking - ranks stores by deals matching your list
+export const GET_STORE_DEALS_RANKING = gql`
+  query GetStoreDealsRanking($userId: ID!) {
+    getStoreDealsRanking(userId: $userId) {
+      rankings {
+        storeName
+        matchedItemCount
+        totalListItems
+        matchPercentage
+        totalSavings
+        isBestValue
+        deals {
+          listItemName
+          dealProductName
+          salePrice
+          regularPrice
+          savings
+          savingsPercent
+        }
+      }
+      bestStore
+      totalPotentialSavings
+      listItemCount
+      message
+    }
+  }
+`;
+
 // Get single flyer with deals
 export const GET_FLYER = gql`
   query GetFlyer($flyerId: ID!) {

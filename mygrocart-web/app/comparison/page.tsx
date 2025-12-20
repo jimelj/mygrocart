@@ -7,97 +7,96 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, DollarSign, TrendingDown, ShoppingCart } from 'lucide-react';
+import { Store, TrendingDown, ShoppingCart, Tag, ChevronDown, ChevronUp, Percent } from 'lucide-react';
 import Link from 'next/link';
-import { COMPARE_PRICES, GET_USER_GROCERY_LISTS } from '@/lib/graphql/queries';
-import { SavingsBanner } from '@/components/ui/SavingsBanner';
+import { GET_STORE_DEALS_RANKING, GET_MY_LIST_WITH_DEALS } from '@/lib/graphql/queries';
 
-interface Store {
-  storeId: string;
-  chainName: string;
+interface MatchedDealSummary {
+  listItemName: string;
+  dealProductName: string;
+  salePrice: number;
+  regularPrice?: number;
+  savings?: number;
+  savingsPercent?: number;
+}
+
+interface StoreDealsRanking {
   storeName: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  matchedItemCount: number;
+  totalListItems: number;
+  matchPercentage: number;
+  totalSavings: number;
+  deals: MatchedDealSummary[];
+  isBestValue: boolean;
 }
 
-interface MissingItem {
-  name: string;
-  upc: string;
-  quantity: number;
-}
-
-interface StoreComparison {
-  store: Store;
-  totalCost: number;
-  itemCount: number;
-  totalItems: number;
-  completionPercentage: number;
-  missingItems: MissingItem[];
-  isCheapest: boolean;
-  savings: number;
-}
-
-interface PriceComparisonResult {
-  userId: string;
-  stores: StoreComparison[];
-  cheapestStore: string | null;
-  maxSavings: number;
+interface StoreDealsRankingResult {
+  rankings: StoreDealsRanking[];
+  bestStore: string | null;
+  totalPotentialSavings: number;
+  listItemCount: number;
   message: string;
 }
 
-// GraphQL Response Types
-interface GetUserGroceryListsResponse {
-  getUserGroceryLists: unknown[];
+interface GetStoreDealsRankingResponse {
+  getStoreDealsRanking: StoreDealsRankingResult;
 }
 
-interface ComparePricesResponse {
-  comparePrices: PriceComparisonResult;
+interface GetMyListResponse {
+  getMyListWithDeals: Array<{ id: string }>;
 }
 
 export default function ComparisonPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const [expandedStore, setExpandedStore] = React.useState<string | null>(null);
 
-  // Redirect to login if not authenticated (wait for auth to load first)
+  // Redirect to login if not authenticated
   React.useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
     }
   }, [isAuthenticated, isLoading, router]);
 
-  const { data: groceryListData } = useQuery<GetUserGroceryListsResponse>(GET_USER_GROCERY_LISTS, {
+  const { data: listData } = useQuery<GetMyListResponse>(GET_MY_LIST_WITH_DEALS, {
     variables: { userId: user?.userId },
     skip: !user?.userId
   });
 
-  const { data: priceComparisonData, loading: comparisonLoading, refetch } = useQuery<ComparePricesResponse>(COMPARE_PRICES, {
-    variables: { userId: user?.userId },
-    skip: !user?.userId,
-    fetchPolicy: 'network-only' // Always fetch fresh prices, don't use cache
-  });
+  const { data: rankingData, loading: rankingLoading, refetch } = useQuery<GetStoreDealsRankingResponse>(
+    GET_STORE_DEALS_RANKING,
+    {
+      variables: { userId: user?.userId },
+      skip: !user?.userId,
+      fetchPolicy: 'network-only'
+    }
+  );
 
-  const groceryList = groceryListData?.getUserGroceryLists || [];
-  const priceComparisonResult = priceComparisonData?.comparePrices;
-  const priceComparison: StoreComparison[] = priceComparisonResult?.stores || [];
+  const listItemCount = listData?.getMyListWithDeals?.length || 0;
+  const result = rankingData?.getStoreDealsRanking;
+  const rankings = result?.rankings || [];
 
   if (!isAuthenticated || !user) {
-    return null; // Will redirect
+    return null;
   }
+
+  const toggleExpand = (storeName: string) => {
+    setExpandedStore(expandedStore === storeName ? null : storeName);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-6 h-6 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Price Comparison</h1>
+                <Store className="w-6 h-6 text-blue-600" />
+                <h1 className="text-3xl font-bold text-gray-900">Best Store for Deals</h1>
               </div>
               <p className="text-gray-600">
-                Comparing {groceryList.length} items across nearby stores
+                See which stores have the most deals for your {listItemCount} list items
               </p>
             </div>
             <Link href="/list">
@@ -109,18 +108,22 @@ export default function ComparisonPage() {
           </div>
         </div>
 
-        {comparisonLoading ? (
+        {/* Loading State */}
+        {rankingLoading && (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Comparing prices across stores...</p>
+            <p className="text-gray-600">Finding the best deals for your list...</p>
           </div>
-        ) : groceryList.length === 0 ? (
+        )}
+
+        {/* Empty List State */}
+        {!rankingLoading && listItemCount === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
               <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No items in your list</h3>
               <p className="text-gray-500 mb-4">
-                Add items to your shopping list to see price comparisons
+                Add items to your shopping list to see which stores have the best deals
               </p>
               <Link href="/list">
                 <Button className="bg-green-600 hover:bg-green-700">
@@ -129,159 +132,194 @@ export default function ComparisonPage() {
               </Link>
             </CardContent>
           </Card>
-        ) : priceComparison.length === 0 ? (
+        )}
+
+        {/* No Deals Found State */}
+        {!rankingLoading && listItemCount > 0 && rankings.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center">
-              <DollarSign className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No price data available</h3>
+              <Tag className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No matching deals found</h3>
               <p className="text-gray-500 mb-4">
-                We don&apos;t have pricing information for your items yet
+                {result?.message || "We couldn't find any current deals matching your list items"}
               </p>
               <Button onClick={() => refetch()} className="bg-green-600 hover:bg-green-700">
-                Refresh Prices
+                Refresh
               </Button>
             </CardContent>
           </Card>
-        ) : (
+        )}
+
+        {/* Store Rankings */}
+        {!rankingLoading && rankings.length > 0 && (
           <>
-            {/* Store Comparison Cards */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {priceComparison.map((comp: StoreComparison) => {
-                // Calculate savings relative to most expensive store
-                const maxTotal = Math.max(...priceComparison.map(c => c.totalCost));
-                const savingsVsMax = maxTotal - comp.totalCost;
+            {/* Summary Banner */}
+            {result?.bestStore && (
+              <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-green-700 font-medium">Best Store for Your List</p>
+                      <p className="text-2xl font-bold text-green-800">{result.bestStore}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-green-700">Potential Savings</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        ${result.totalPotentialSavings.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-                return (
-                  <Card
-                    key={comp.store.storeId}
-                    className={`${
-                      comp.isCheapest
-                        ? 'ring-2 ring-green-500 shadow-lg'
-                        : ''
-                    } transition-all hover:shadow-xl`}
-                  >
-                    <CardHeader>
-                      {comp.isCheapest && (
-                        <Badge className="w-fit mb-2 bg-green-500 hover:bg-green-600">
-                          Best Deal!
-                        </Badge>
-                      )}
-                      <CardTitle className="text-xl">{comp.store.chainName}</CardTitle>
-                      <CardDescription className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        {comp.store.storeName}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 mb-4">
-                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <span className="text-gray-600">Total Cost:</span>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-gray-900">
-                              ${comp.totalCost.toFixed(2)}
-                            </div>
-                            {!comp.isCheapest && savingsVsMax > 0 && (
-                              <div className="text-xs text-red-600">
-                                (+${savingsVsMax.toFixed(2)})
-                              </div>
-                            )}
-                            {comp.isCheapest && (
-                              <div className="text-xs text-green-600 font-medium">
-                                (Cheapest!)
-                              </div>
-                            )}
-                          </div>
+            {/* Store Cards */}
+            <div className="space-y-4">
+              {rankings.map((store, index) => (
+                <Card
+                  key={store.storeName}
+                  className={`overflow-hidden transition-all ${
+                    store.isBestValue ? 'ring-2 ring-green-500 shadow-lg' : ''
+                  }`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                          index === 0 ? 'bg-green-500' : index === 1 ? 'bg-blue-500' : 'bg-gray-400'
+                        }`}>
+                          {index + 1}
                         </div>
-                        {savingsVsMax > 0 && (
-                          <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                            <span className="text-gray-600">You Save:</span>
-                            <span className="text-xl font-bold text-green-600">
-                              ${savingsVsMax.toFixed(2)}
-                            </span>
-                          </div>
-                        )}
+                        <div>
+                          <CardTitle className="text-xl flex items-center gap-2">
+                            {store.storeName}
+                            {store.isBestValue && (
+                              <Badge className="bg-green-500 hover:bg-green-600">Best Value</Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription>
+                            {store.matchedItemCount} of {store.totalListItems} items on sale
+                          </CardDescription>
+                        </div>
                       </div>
-
-                      {/* Completion Info */}
-                      {comp.completionPercentage < 100 && (
-                        <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                          <p className="text-yellow-800">
-                            {comp.itemCount} of {comp.totalItems} items available ({comp.completionPercentage.toFixed(0)}%)
-                          </p>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-green-600">
+                          ${store.totalSavings.toFixed(2)}
                         </div>
-                      )}
+                        <div className="text-sm text-gray-500">potential savings</div>
+                      </div>
+                    </div>
+                  </CardHeader>
 
-                      <Button
-                        className={`w-full ${
-                          comp.isCheapest
-                            ? 'bg-green-600 hover:bg-green-700'
-                            : 'bg-gray-600 hover:bg-gray-700'
-                        }`}
-                      >
-                        Shop Here
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                  <CardContent className="pt-0">
+                    {/* Progress Bar */}
+                    <div className="mb-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">Deal Coverage</span>
+                        <span className="font-medium">{store.matchPercentage}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div
+                          className={`h-2.5 rounded-full ${
+                            store.matchPercentage >= 50 ? 'bg-green-500' : 'bg-yellow-500'
+                          }`}
+                          style={{ width: `${store.matchPercentage}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Expand/Collapse Deals */}
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between"
+                      onClick={() => toggleExpand(store.storeName)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        View {store.deals.length} matching deals
+                      </span>
+                      {expandedStore === store.storeName ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </Button>
+
+                    {/* Deals List (Expanded) */}
+                    {expandedStore === store.storeName && (
+                      <div className="mt-4 space-y-3 border-t pt-4">
+                        {store.deals.map((deal, dealIndex) => (
+                          <div
+                            key={dealIndex}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                          >
+                            <div>
+                              <p className="font-medium text-gray-900">{deal.listItemName}</p>
+                              <p className="text-sm text-gray-500">{deal.dealProductName}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-green-600">${deal.salePrice.toFixed(2)}</p>
+                              {deal.regularPrice && (
+                                <p className="text-sm text-gray-500 line-through">
+                                  ${deal.regularPrice.toFixed(2)}
+                                </p>
+                              )}
+                              {deal.savingsPercent && deal.savingsPercent > 0 && (
+                                <Badge variant="outline" className="mt-1 text-orange-600 border-orange-300">
+                                  <Percent className="w-3 h-3 mr-1" />
+                                  {deal.savingsPercent}% off
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            {/* Savings Summary */}
-            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            {/* Summary Card */}
+            <Card className="mt-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingDown className="w-5 h-5 text-green-600" />
-                  Savings Summary
+                  <TrendingDown className="w-5 h-5 text-blue-600" />
+                  Summary
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-3 gap-6">
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-3xl font-bold text-green-600 mb-1">
-                      ${(priceComparisonResult?.maxSavings || 0).toFixed(2)}
+                    <div className="text-3xl font-bold text-blue-600 mb-1">
+                      {rankings.length}
                     </div>
-                    <div className="text-sm text-gray-600">Maximum Savings</div>
+                    <div className="text-sm text-gray-600">Stores with Deals</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                     <div className="text-3xl font-bold text-green-600 mb-1">
-                      {priceComparison.length > 0 && priceComparisonResult?.maxSavings
-                        ? Math.round(
-                            (priceComparisonResult.maxSavings /
-                              Math.max(...priceComparison.map(c => c.totalCost))) *
-                              100
-                          )
-                        : 0}
-                      %
+                      ${result?.totalPotentialSavings.toFixed(2) || '0.00'}
                     </div>
-                    <div className="text-sm text-gray-600">Percentage Saved</div>
+                    <div className="text-sm text-gray-600">Total Potential Savings</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-3xl font-bold text-green-600 mb-1">
-                      {priceComparison.length}
+                    <div className="text-3xl font-bold text-orange-600 mb-1">
+                      {rankings[0]?.matchPercentage || 0}%
                     </div>
-                    <div className="text-sm text-gray-600">Stores Compared</div>
+                    <div className="text-sm text-gray-600">Best Coverage</div>
                   </div>
                 </div>
 
-                {priceComparisonResult?.message && (
-                  <div className="mt-6 p-4 bg-white rounded-lg">
-                    <h4 className="font-semibold text-gray-900 mb-2">Shopping Tip</h4>
-                    <p className="text-sm text-gray-600">
-                      {priceComparisonResult.message}
-                    </p>
-                  </div>
-                )}
+                <div className="mt-6 p-4 bg-white rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">Shopping Tip</h4>
+                  <p className="text-sm text-gray-600">
+                    {rankings.length > 1
+                      ? `${rankings[0].storeName} has the most deals for your list (${rankings[0].matchedItemCount} items). Consider shopping there to maximize your savings!`
+                      : result?.message || 'Check back when more stores have matching deals for your items.'}
+                  </p>
+                </div>
               </CardContent>
             </Card>
-
-            {/* Savings Banner */}
-            {priceComparisonResult?.cheapestStore && priceComparisonResult?.maxSavings > 0 && (
-              <SavingsBanner
-                cheapestStore={priceComparisonResult.cheapestStore}
-                maxSavings={priceComparisonResult.maxSavings}
-                variant="default"
-              />
-            )}
 
             {/* Action Buttons */}
             <div className="mt-6 flex gap-4 justify-center">
@@ -291,9 +329,12 @@ export default function ComparisonPage() {
                   Edit Shopping List
                 </Button>
               </Link>
-              <Button onClick={() => refetch()} className="bg-green-600 hover:bg-green-700">
-                Refresh Prices
-              </Button>
+              <Link href="/deals/matches">
+                <Button className="bg-green-600 hover:bg-green-700">
+                  <Tag className="w-4 h-4 mr-2" />
+                  View All Matched Deals
+                </Button>
+              </Link>
             </div>
           </>
         )}

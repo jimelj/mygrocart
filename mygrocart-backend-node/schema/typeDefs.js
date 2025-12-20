@@ -323,6 +323,34 @@ const typeDefs = gql`
     totalPages: Int!
   }
 
+  # Store deals ranking for flyer-based comparison
+  type StoreDealsRanking {
+    storeName: String!
+    matchedItemCount: Int!
+    totalListItems: Int!
+    matchPercentage: Float!
+    totalSavings: Float!
+    deals: [MatchedDealSummary!]!
+    isBestValue: Boolean!
+  }
+
+  type MatchedDealSummary {
+    listItemName: String!
+    dealProductName: String!
+    salePrice: Float!
+    regularPrice: Float
+    savings: Float
+    savingsPercent: Float
+  }
+
+  type StoreDealsRankingResult {
+    rankings: [StoreDealsRanking!]!
+    bestStore: String
+    totalPotentialSavings: Float!
+    listItemCount: Int!
+    message: String!
+  }
+
   type Query {
     # User queries
     me: User
@@ -368,6 +396,9 @@ const typeDefs = gql`
     # Shopping list with deal matching
     getMyListWithDeals(userId: ID!): [UserListItem!]!
     matchDealsToMyList(userId: ID!): [DealMatch!]!
+
+    # Store deals ranking (flyer-based comparison)
+    getStoreDealsRanking(userId: ID!): StoreDealsRankingResult!
 
     # Notifications
     getMyNotifications(userId: ID!, limit: Int): [UserNotification!]!
