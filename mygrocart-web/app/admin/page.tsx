@@ -298,6 +298,8 @@ export default function AdminDashboard() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) return "-";
     return date.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
@@ -307,8 +309,15 @@ export default function AdminDashboard() {
   };
 
   const formatDateRange = (from: string, to: string) => {
+    if (!from || !to) return "No dates";
+
     const fromDate = new Date(from);
     const toDate = new Date(to);
+
+    // Check if dates are valid
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      return "No dates";
+    }
 
     return `${fromDate.toLocaleDateString("en-US", {
       month: "short",

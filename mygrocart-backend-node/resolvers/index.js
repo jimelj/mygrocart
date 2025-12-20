@@ -1890,6 +1890,54 @@ const resolvers = {
         return [];
       }
     }
+  },
+
+  // UserListItem field resolver for matching deals
+  UserListItem: {
+    matchingDeals: async (parent) => {
+      try {
+        // Get the user to find their ZIP code
+        const user = await User.findByPk(parent.userId);
+        if (!user) return [];
+
+        // Get current deals for user's ZIP
+        const deals = await Deal.findAll({
+          where: {
+            zipCode: user.zipCode,
+            validTo: { [Op.gte]: new Date() }
+          }
+        });
+
+        const itemName = parent.itemName.toLowerCase();
+        const variant = parent.itemVariant?.toLowerCase();
+
+        // Match deals to this list item
+        const matched = deals
+          .filter(deal => {
+            const dealText = deal.productName.toLowerCase();
+            if (!dealText.includes(itemName)) return false;
+            if (variant && !dealText.includes(variant)) return false;
+            return true;
+          })
+          .map(deal => {
+            const dealPlain = deal.get({ plain: true });
+            return {
+              ...dealPlain,
+              savings: dealPlain.regularPrice
+                ? parseFloat((dealPlain.regularPrice - dealPlain.salePrice).toFixed(2))
+                : null,
+              savingsPercent: dealPlain.regularPrice
+                ? parseFloat((((dealPlain.regularPrice - dealPlain.salePrice) / dealPlain.regularPrice) * 100).toFixed(0))
+                : null
+            };
+          });
+
+        return matched;
+      } catch (error) {
+        console.error('[UserListItem.matchingDeals] Error:', error.message);
+        return [];
+      }
+    }
   }
 };
 

@@ -13,6 +13,22 @@ const path = require('path');
 cloudinary.config();
 
 /**
+ * Safely parse Unix timestamp to Date, with fallback
+ */
+const safeParseDate = (timestamp, fallbackDays = 0) => {
+  if (timestamp && !isNaN(timestamp)) {
+    const date = new Date(timestamp * 1000);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  // Fallback: return current date + fallbackDays
+  const fallback = new Date();
+  fallback.setDate(fallback.getDate() + fallbackDays);
+  return fallback;
+};
+
+/**
  * FlyerService - Handles flyer ingestion from WeeklyAds2 API
  *
  * This service:
@@ -964,8 +980,8 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
           flyerRunId: flyerData.flyer_run_id,
           flyerName: flyerData.name,
           zipCode: sanitizedZipCode || '00000',
-          validFrom: new Date(flyerData.valid_from * 1000),
-          validTo: new Date(flyerData.valid_to * 1000),
+          validFrom: safeParseDate(flyerData.valid_from, 0),
+          validTo: safeParseDate(flyerData.valid_to, 7),
           imageUrls: flyerData.imageUrls || [],
           flyerPath: flyerData.flyerPath,
           status: deals.length > 0 ? 'completed' : 'pending',
@@ -1000,8 +1016,8 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         flyerRunId: flyerData.flyer_run_id,
         flyerName: flyerData.name,
         zipCode: sanitizedZipCode,
-        validFrom: new Date(flyerData.valid_from * 1000),
-        validTo: new Date(flyerData.valid_to * 1000),
+        validFrom: safeParseDate(flyerData.valid_from, 0),
+        validTo: safeParseDate(flyerData.valid_to, 7),
         imageUrls: flyerData.imageUrls || [],
         flyerPath: flyerData.flyerPath,
         status: deals.length > 0 ? 'completed' : 'pending',
@@ -1025,8 +1041,8 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
             unit: deal.unit || 'each',
             dealType: deal.dealType || 'sale',
             quantity: deal.quantity || null,
-            validFrom: new Date(flyerData.valid_from * 1000),
-            validTo: new Date(flyerData.valid_to * 1000),
+            validFrom: safeParseDate(flyerData.valid_from, 0),
+            validTo: safeParseDate(flyerData.valid_to, 7),
             confidence: deal.confidence || 0.0,
             rawText: deal.rawText || null,
             imageUrl: deal.imageUrl || null
