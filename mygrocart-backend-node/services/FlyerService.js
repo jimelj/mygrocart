@@ -443,6 +443,76 @@ class FlyerService {
   }
 
   /**
+   * Download flyer pages in low-memory mode (no stitching)
+   * For very large flyers, we download individual low-res pages directly
+   * @param {object} flyer - Flyer object from API
+   * @param {string} flyerPath - CDN path
+   * @returns {Promise<Array>} Array of image URLs
+   */
+  async downloadFlyerPagesLowMemory(flyer, flyerPath) {
+    try {
+      // Probe how many pages exist at zoom level 0 (lowest resolution)
+      // At zoom 0, each tile is a full page
+      const pageCount = await this.probePageCount(flyerPath);
+
+      if (pageCount === 0) {
+        console.warn(`[FlyerService] No pages found for ${flyer.merchant}`);
+        return [];
+      }
+
+      console.log(`[FlyerService] Low-memory mode: Found ${pageCount} pages for ${flyer.merchant}`);
+
+      // Download each page at zoom level 0 (single tile per page, ~256x256 or larger)
+      // This avoids any stitching and keeps memory usage minimal
+      const imageUrls = [];
+
+      for (let page = 0; page < Math.min(pageCount, 20); page++) { // Limit to 20 pages
+        const pageUrl = `${this.CDN_BASE_URL}/${flyerPath}0_0_${page}.jpg`;
+
+        try {
+          // Verify page exists
+          const response = await axios.head(pageUrl, { timeout: 5000 });
+
+          if (response.status === 200) {
+            if (process.env.CLOUDINARY_URL) {
+              // Upload to Cloudinary for better OCR quality
+              try {
+                const result = await cloudinary.uploader.upload(pageUrl, {
+                  folder: `flyers/${flyer.flyer_run_id}`,
+                  public_id: `page_${page + 1}_lowres`,
+                  resource_type: 'image',
+                  overwrite: true,
+                  timeout: 30000
+                });
+                imageUrls.push(result.secure_url);
+                console.log(`[FlyerService] Uploaded page ${page + 1}/${pageCount} to Cloudinary`);
+              } catch (uploadError) {
+                // Fallback to CDN URL
+                imageUrls.push(pageUrl);
+                console.log(`[FlyerService] Using CDN URL for page ${page + 1}`);
+              }
+            } else {
+              imageUrls.push(pageUrl);
+            }
+          }
+        } catch {
+          // Page doesn't exist, stop
+          break;
+        }
+
+        // Small delay between uploads
+        await this.delay(200);
+      }
+
+      console.log(`[FlyerService] Low-memory mode: Got ${imageUrls.length} page URLs for ${flyer.merchant}`);
+      return imageUrls;
+    } catch (error) {
+      console.error(`[FlyerService] Low-memory download failed:`, error.message);
+      return [];
+    }
+  }
+
+  /**
    * Download flyer images at a specific zoom level (for large flyers)
    * @param {object} flyer - Flyer object from API
    * @param {string} flyerPath - CDN path
@@ -620,20 +690,12 @@ class FlyerService {
       const totalTiles = cols * rows;
       console.log(`[FlyerService] Processing ${flyer.merchant}: ${cols}x${rows} tiles (${totalTiles} total)`);
 
-      // For very large flyers (like Costco with 1024 tiles), use lower zoom level
+      // For very large flyers (like Costco with 1024 tiles), skip stitching entirely
       // to prevent memory issues on Render's 512MB limit
+      // Instead, use zoom level 0 (lowest res) individual pages
       if (totalTiles > MAX_TILES) {
-        console.log(`[FlyerService] Large flyer detected (${totalTiles} tiles > ${MAX_TILES}). Using zoom level 4 instead of 5.`);
-
-        // At zoom level 4, tiles are 2x larger, so we need 1/4 as many
-        const lowerCols = Math.ceil(cols / 2);
-        const lowerRows = Math.ceil(rows / 2);
-        const lowerTiles = lowerCols * lowerRows;
-
-        console.log(`[FlyerService] Reduced to ${lowerCols}x${lowerRows} tiles (${lowerTiles} total) at zoom 4`);
-
-        // Use zoom level 4 instead of 5
-        return await this.downloadFlyerImagesAtZoom(flyer, flyerPath, lowerCols, lowerRows, 4);
+        console.log(`[FlyerService] Large flyer detected (${totalTiles} tiles > ${MAX_TILES}). Using low-memory page mode.`);
+        return await this.downloadFlyerPagesLowMemory(flyer, flyerPath);
       }
 
       // Step 1: Stitch the full flyer
