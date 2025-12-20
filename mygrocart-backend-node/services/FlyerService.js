@@ -350,7 +350,7 @@ class FlyerService {
    */
   async stitchFullFlyer(flyerPath, cols, rows) {
     const TILE_SIZE = 256;
-    const BATCH_SIZE = 50; // Download 50 tiles at a time to avoid overwhelming the server
+    const BATCH_SIZE = 30; // Smaller batches for better memory management
 
     try {
       console.log(`[FlyerService] Downloading ${cols * rows} tiles (${cols}x${rows})...`);
@@ -383,9 +383,9 @@ class FlyerService {
         const batchTiles = (await Promise.all(batchPromises)).filter(t => t !== null);
         allTiles.push(...batchTiles);
 
-        // Small delay between batches
+        // Delay between batches to allow GC
         if (batch < Math.ceil(totalTiles / BATCH_SIZE) - 1) {
-          await this.delay(100);
+          await this.delay(150);
         }
       }
 
@@ -407,6 +407,9 @@ class FlyerService {
         top: (rows - 1 - tile.row) * TILE_SIZE
       }));
 
+      // Clear tile data to free memory before compositing
+      allTiles.length = 0;
+
       const stitchedImage = await sharp({
         create: {
           width: compositeWidth,
@@ -416,7 +419,7 @@ class FlyerService {
         }
       })
       .composite(compositeOps)
-      .jpeg({ quality: 90 })
+      .jpeg({ quality: 85 }) // Slightly lower quality for smaller file size
       .toBuffer();
 
       console.log(`[FlyerService] Stitched full flyer: ${compositeWidth}x${compositeHeight}`);
@@ -814,8 +817,8 @@ class FlyerService {
    */
   async downloadFlyerImages(flyer) {
     const TILE_SIZE = 256;
-    const MAX_TILES = 80; // Lower limit to prevent memory issues on Render (512MB)
-    const MEDIUM_TILES = 400; // Threshold for very large flyers
+    const MAX_TILES = 120; // Balanced limit for full quality (Render 512MB)
+    const MEDIUM_TILES = 300; // Threshold for medium quality (zoom 4)
 
     try {
       const flyerPath = this.parseFlyerPath(flyer);
@@ -854,9 +857,9 @@ class FlyerService {
       console.log(`[FlyerService] Processing ${flyer.merchant}: ${cols}x${rows} tiles (${totalTiles} total)`);
 
       // Memory-conscious processing based on tile count:
-      // - <= 80 tiles: Full quality at zoom level 5 with stitching
-      // - 81-400 tiles: Medium quality at zoom level 4 (1/4 tiles)
-      // - > 400 tiles: Low-memory page mode using zoom level 3
+      // - <= 120 tiles: Full quality at zoom level 5 with stitching
+      // - 121-300 tiles: Medium quality at zoom level 4 (1/4 tiles)
+      // - > 300 tiles: Low-memory page mode (individual pages)
       if (totalTiles > MEDIUM_TILES) {
         console.log(`[FlyerService] Very large flyer (${totalTiles} tiles > ${MEDIUM_TILES}). Using low-memory page mode.`);
         return await this.downloadFlyerPagesLowMemory(flyer, flyerPath);
