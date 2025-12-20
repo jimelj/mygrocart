@@ -329,6 +329,7 @@ const typeDefs = gql`
     matchedItemCount: Int!
     totalListItems: Int!
     matchPercentage: Float!
+    totalCost: Float!
     totalSavings: Float!
     deals: [MatchedDealSummary!]!
     isBestValue: Boolean!
@@ -339,8 +340,10 @@ const typeDefs = gql`
     dealProductName: String!
     salePrice: Float!
     regularPrice: Float
+    lowestPrice: Float
     savings: Float
     savingsPercent: Float
+    isBestPrice: Boolean
   }
 
   type StoreDealsRankingResult {

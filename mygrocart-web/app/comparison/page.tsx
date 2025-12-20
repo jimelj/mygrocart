@@ -16,8 +16,10 @@ interface MatchedDealSummary {
   dealProductName: string;
   salePrice: number;
   regularPrice?: number;
+  lowestPrice?: number;
   savings?: number;
   savingsPercent?: number;
+  isBestPrice?: boolean;
 }
 
 interface StoreDealsRanking {
@@ -25,6 +27,7 @@ interface StoreDealsRanking {
   matchedItemCount: number;
   totalListItems: number;
   matchPercentage: number;
+  totalCost: number;
   totalSavings: number;
   deals: MatchedDealSummary[];
   isBestValue: boolean;
@@ -93,10 +96,10 @@ export default function ComparisonPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Store className="w-6 h-6 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Best Store for Deals</h1>
+                <h1 className="text-3xl font-bold text-gray-900">Compare Store Prices</h1>
               </div>
               <p className="text-gray-600">
-                See which stores have the most deals for your {listItemCount} list items
+                Find the lowest total cost for your {listItemCount} list items
               </p>
             </div>
             <Link href="/list">
@@ -154,18 +157,18 @@ export default function ComparisonPage() {
         {!rankingLoading && rankings.length > 0 && (
           <>
             {/* Summary Banner */}
-            {result?.bestStore && (
+            {result?.bestStore && rankings.length > 0 && (
               <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-green-700 font-medium">Best Store for Your List</p>
+                      <p className="text-sm text-green-700 font-medium">Lowest Cost Store</p>
                       <p className="text-2xl font-bold text-green-800">{result.bestStore}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-green-700">Potential Savings</p>
+                      <p className="text-sm text-green-700">Total Cost</p>
                       <p className="text-2xl font-bold text-green-600">
-                        ${result.totalPotentialSavings.toFixed(2)}
+                        ${rankings[0]?.totalCost?.toFixed(2) || '0.00'}
                       </p>
                     </div>
                   </div>
@@ -203,10 +206,10 @@ export default function ComparisonPage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-green-600">
-                          ${store.totalSavings.toFixed(2)}
+                        <div className="text-2xl font-bold text-blue-600">
+                          ${store.totalCost.toFixed(2)}
                         </div>
-                        <div className="text-sm text-gray-500">potential savings</div>
+                        <div className="text-sm text-gray-500">total cost</div>
                       </div>
                     </div>
                   </CardHeader>
@@ -251,24 +254,32 @@ export default function ComparisonPage() {
                         {store.deals.map((deal, dealIndex) => (
                           <div
                             key={dealIndex}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                            className={`flex items-center justify-between p-3 rounded-lg ${
+                              deal.isBestPrice ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                            }`}
                           >
                             <div>
-                              <p className="font-medium text-gray-900">{deal.listItemName}</p>
+                              <p className="font-medium text-gray-900 flex items-center gap-2">
+                                {deal.listItemName}
+                                {deal.isBestPrice && (
+                                  <Badge className="bg-green-500 text-xs">Best Price</Badge>
+                                )}
+                              </p>
                               <p className="text-sm text-gray-500">{deal.dealProductName}</p>
                             </div>
                             <div className="text-right">
-                              <p className="font-bold text-green-600">${deal.salePrice.toFixed(2)}</p>
+                              <p className={`font-bold ${deal.isBestPrice ? 'text-green-600' : 'text-blue-600'}`}>
+                                ${deal.salePrice.toFixed(2)}
+                              </p>
                               {deal.regularPrice && (
                                 <p className="text-sm text-gray-500 line-through">
                                   ${deal.regularPrice.toFixed(2)}
                                 </p>
                               )}
-                              {deal.savingsPercent && deal.savingsPercent > 0 && (
-                                <Badge variant="outline" className="mt-1 text-orange-600 border-orange-300">
-                                  <Percent className="w-3 h-3 mr-1" />
-                                  {deal.savingsPercent}% off
-                                </Badge>
+                              {!deal.isBestPrice && deal.lowestPrice && deal.salePrice > deal.lowestPrice && (
+                                <p className="text-xs text-orange-600">
+                                  ${(deal.salePrice - deal.lowestPrice).toFixed(2)} more
+                                </p>
                               )}
                             </div>
                           </div>
@@ -291,22 +302,26 @@ export default function ComparisonPage() {
               <CardContent>
                 <div className="grid md:grid-cols-3 gap-6">
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+                    <div className="text-3xl font-bold text-green-600 mb-1">
+                      ${rankings[0]?.totalCost?.toFixed(2) || '0.00'}
+                    </div>
+                    <div className="text-sm text-gray-600">Lowest Total Cost</div>
+                  </div>
+                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                     <div className="text-3xl font-bold text-blue-600 mb-1">
                       {rankings.length}
                     </div>
-                    <div className="text-sm text-gray-600">Stores with Deals</div>
-                  </div>
-                  <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-3xl font-bold text-green-600 mb-1">
-                      ${result?.totalPotentialSavings.toFixed(2) || '0.00'}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Potential Savings</div>
+                    <div className="text-sm text-gray-600">Stores Compared</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
                     <div className="text-3xl font-bold text-orange-600 mb-1">
-                      {rankings[0]?.matchPercentage || 0}%
+                      {rankings.length > 1
+                        ? `$${(rankings[rankings.length - 1]?.totalCost - rankings[0]?.totalCost).toFixed(2)}`
+                        : '$0.00'}
                     </div>
-                    <div className="text-sm text-gray-600">Best Coverage</div>
+                    <div className="text-sm text-gray-600">
+                      {rankings.length > 1 ? 'Saved vs Highest' : 'Price Difference'}
+                    </div>
                   </div>
                 </div>
 
@@ -314,7 +329,7 @@ export default function ComparisonPage() {
                   <h4 className="font-semibold text-gray-900 mb-2">Shopping Tip</h4>
                   <p className="text-sm text-gray-600">
                     {rankings.length > 1
-                      ? `${rankings[0].storeName} has the most deals for your list (${rankings[0].matchedItemCount} items). Consider shopping there to maximize your savings!`
+                      ? `${rankings[0].storeName} has the lowest total cost ($${rankings[0].totalCost.toFixed(2)}) for your ${rankings[0].matchedItemCount} matched items. You would pay $${(rankings[rankings.length - 1]?.totalCost - rankings[0]?.totalCost).toFixed(2)} more at ${rankings[rankings.length - 1]?.storeName}.`
                       : result?.message || 'Check back when more stores have matching deals for your items.'}
                   </p>
                 </div>

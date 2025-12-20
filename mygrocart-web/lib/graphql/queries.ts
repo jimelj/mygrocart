@@ -434,6 +434,7 @@ export const GET_STORE_DEALS_RANKING = gql`
         matchedItemCount
         totalListItems
         matchPercentage
+        totalCost
         totalSavings
         isBestValue
         deals {
@@ -441,8 +442,10 @@ export const GET_STORE_DEALS_RANKING = gql`
           dealProductName
           salePrice
           regularPrice
+          lowestPrice
           savings
           savingsPercent
+          isBestPrice
         }
       }
       bestStore
