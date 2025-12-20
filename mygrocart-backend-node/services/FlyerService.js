@@ -1242,9 +1242,10 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
           // Enrich deals with product images
           const enrichedDeals = await this.enrichDealsWithImages(deals);
 
-          // Save to database
+          // Save to database - override postal_code with the requested zipCode
           await this.saveFlyer({
             ...flyerData,
+            postal_code: zipCode,  // Use the requested ZIP, not the API's postal_code
             imageUrls: cloudinaryUrls,
             flyerPath: this.parseFlyerPath(flyerData)
           }, enrichedDeals);
