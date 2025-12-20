@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { calculateDistance } = require('../utils/distance');
 const sampleData = require('../utils/sampleData');
-const { Op } = require('sequelize');
+const { Op, fn, col, literal } = require('sequelize');
 
 // Import Sequelize models
 const User = require('../models/User');
@@ -971,7 +971,7 @@ const resolvers = {
             ...where,
             validTo: { [Op.gte]: new Date() }
           },
-          attributes: [[require('sequelize').fn('COUNT', require('sequelize').fn('DISTINCT', require('sequelize').col('storeName'))), 'count']],
+          attributes: [[fn('COUNT', fn('DISTINCT', col('storeName'))), 'count']],
           raw: true
         });
         const activeStores = activeStoresResult[0]?.count || 0;
@@ -981,7 +981,7 @@ const resolvers = {
           where,
           attributes: [
             'storeName',
-            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+            [fn('COUNT', col('id')), 'count']
           ],
           group: ['storeName'],
           raw: true
@@ -992,7 +992,7 @@ const resolvers = {
           where: dealWhere,
           attributes: [
             'storeName',
-            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+            [fn('COUNT', col('id')), 'count']
           ],
           group: ['storeName'],
           raw: true
@@ -1187,7 +1187,7 @@ const resolvers = {
           where: dealWhere,
           attributes: [
             'storeName',
-            [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'count']
+            [fn('COUNT', col('id')), 'count']
           ],
           group: ['storeName'],
           raw: true

@@ -78,21 +78,18 @@ export default function ShoppingListPage() {
 
   // GraphQL Mutations
   const [addItem] = useMutation(ADD_LIST_ITEM, {
-    refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
     onError: (error) => {
       console.error('Error adding item:', error);
     }
   });
 
   const [updateItem] = useMutation(UPDATE_LIST_ITEM, {
-    refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
     onError: (error) => {
       console.error('Error updating item:', error);
     }
   });
 
   const [removeItem] = useMutation(REMOVE_LIST_ITEM, {
-    refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
     onError: (error) => {
       console.error('Error removing item:', error);
     }
@@ -108,6 +105,8 @@ export default function ShoppingListPage() {
           category,
           quantity: 1,
         },
+        refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+        awaitRefetchQueries: true,
       });
     } catch (error) {
       console.error('Failed to add item:', error);
@@ -123,6 +122,8 @@ export default function ShoppingListPage() {
           id,
           quantity: newQuantity,
         },
+        refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+        awaitRefetchQueries: true,
       });
     } catch (error) {
       console.error('Failed to update quantity:', error);
@@ -136,6 +137,8 @@ export default function ShoppingListPage() {
           id,
           checked: !checked,
         },
+        refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+        awaitRefetchQueries: true,
       });
     } catch (error) {
       console.error('Failed to toggle checked:', error);
@@ -146,6 +149,8 @@ export default function ShoppingListPage() {
     try {
       await removeItem({
         variables: { id },
+        refetchQueries: [{ query: GET_MY_LIST_WITH_DEALS, variables: { userId: user?.userId } }],
+        awaitRefetchQueries: true,
       });
       setDeleteConfirmId(null);
     } catch (error) {
