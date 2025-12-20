@@ -971,10 +971,10 @@ const resolvers = {
             ...where,
             validTo: { [Op.gte]: new Date() }
           },
-          attributes: [[fn('COUNT', fn('DISTINCT', col('storeName'))), 'count']],
+          attributes: [[literal('COUNT(DISTINCT "storeName")'), 'count']],
           raw: true
         });
-        const activeStores = activeStoresResult[0]?.count || 0;
+        const activeStores = parseInt(activeStoresResult[0]?.count) || 0;
 
         // Get flyers grouped by store
         const flyersByStore = await Flyer.findAll({
