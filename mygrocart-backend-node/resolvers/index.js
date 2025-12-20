@@ -995,17 +995,23 @@ const resolvers = {
         const lowestPricePerItem = new Map(); // itemId -> lowestPrice
         for (const [itemId, itemData] of itemDealsMap) {
           if (itemData.deals.length > 0) {
-            const lowestPrice = Math.min(...itemData.deals.map(d => d.salePrice));
-            lowestPricePerItem.set(itemId, lowestPrice);
+            const prices = itemData.deals.map(d => d.salePrice).filter(p => p != null && !isNaN(p));
+            if (prices.length > 0) {
+              const lowestPrice = Math.min(...prices);
+              lowestPricePerItem.set(itemId, lowestPrice);
+            }
           }
         }
 
         // Step 3: Build store data with total cost and savings vs lowest
         for (const [itemId, itemData] of itemDealsMap) {
-          const lowestPrice = lowestPricePerItem.get(itemId);
+          const lowestPrice = lowestPricePerItem.get(itemId) || 0;
 
           for (const deal of itemData.deals) {
-            const storeName = deal.storeName;
+            // Skip deals without valid sale price
+            if (deal.salePrice == null || isNaN(deal.salePrice)) continue;
+
+            const storeName = deal.storeName || 'Unknown Store';
 
             if (!storeDealsMap.has(storeName)) {
               storeDealsMap.set(storeName, {
@@ -1020,19 +1026,22 @@ const resolvers = {
             // Only keep the best (lowest) price per item per store
             const existingDeal = storeData.matchedItems.get(itemId);
             if (!existingDeal || deal.salePrice < existingDeal.salePrice) {
+              const salePrice = parseFloat(deal.salePrice) || 0;
+              const regularPrice = deal.regularPrice ? parseFloat(deal.regularPrice) : null;
+
               storeData.matchedItems.set(itemId, {
                 listItemName: itemData.itemName,
-                dealProductName: deal.productName,
-                salePrice: deal.salePrice,
-                regularPrice: deal.regularPrice,
+                dealProductName: deal.productName || 'Unknown Product',
+                salePrice: salePrice,
+                regularPrice: regularPrice,
                 lowestPrice: lowestPrice,
                 // Savings vs regular price (if available)
-                savings: deal.regularPrice ? parseFloat((deal.regularPrice - deal.salePrice).toFixed(2)) : null,
-                savingsPercent: deal.regularPrice
-                  ? parseFloat((((deal.regularPrice - deal.salePrice) / deal.regularPrice) * 100).toFixed(0))
+                savings: regularPrice ? parseFloat((regularPrice - salePrice).toFixed(2)) : null,
+                savingsPercent: regularPrice
+                  ? parseFloat((((regularPrice - salePrice) / regularPrice) * 100).toFixed(0))
                   : null,
                 // Is this the lowest price across all stores?
-                isBestPrice: deal.salePrice === lowestPrice
+                isBestPrice: salePrice === lowestPrice
               });
             }
           }
@@ -1063,14 +1072,15 @@ const resolvers = {
           .map(store => {
             const deals = Array.from(store.matchedItems.values());
             const totalSavings = deals.reduce((sum, d) => sum + (d.savings || 0), 0);
+            const totalCost = store.totalCost || 0;
 
             return {
               storeName: store.storeName,
               matchedItemCount: store.matchedItems.size,
               totalListItems: listItems.length,
-              matchPercentage: parseFloat(((store.matchedItems.size / listItems.length) * 100).toFixed(0)),
-              totalCost: parseFloat(store.totalCost.toFixed(2)),
-              totalSavings: parseFloat(totalSavings.toFixed(2)), // Savings vs regular prices
+              matchPercentage: parseFloat(((store.matchedItems.size / listItems.length) * 100).toFixed(0)) || 0,
+              totalCost: parseFloat(totalCost.toFixed(2)) || 0,
+              totalSavings: parseFloat(totalSavings.toFixed(2)) || 0, // Savings vs regular prices
               deals: deals,
               isBestValue: false // Will be set below
             };
@@ -1089,12 +1099,12 @@ const resolvers = {
         }
 
         // Calculate total potential savings = lowest total cost store's savings
-        const totalPotentialSavings = rankings.length > 0 ? rankings[0].totalSavings : 0;
+        const totalPotentialSavings = rankings.length > 0 ? (rankings[0].totalSavings || 0) : 0;
 
         return {
           rankings,
           bestStore: rankings.length > 0 ? rankings[0].storeName : null,
-          totalPotentialSavings: parseFloat(totalPotentialSavings.toFixed(2)),
+          totalPotentialSavings: parseFloat((totalPotentialSavings || 0).toFixed(2)),
           listItemCount: listItems.length,
           message: rankings.length > 0
             ? `Found deals at ${rankings.length} stores for your list`
