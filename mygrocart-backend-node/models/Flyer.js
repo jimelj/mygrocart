@@ -23,10 +23,10 @@ const Flyer = sequelize.define('Flyer', {
     comment: 'URL-friendly store identifier (e.g., "target", "shoprite")'
   },
   flyerRunId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     allowNull: false,
     unique: true,
-    comment: 'Unique identifier from WeeklyAds2 API'
+    comment: 'Unique identifier (WeeklyAds2 numeric ID or scraper slug-zip-date)'
   },
   flyerName: {
     type: DataTypes.STRING,

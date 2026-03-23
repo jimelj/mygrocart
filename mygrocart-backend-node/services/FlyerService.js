@@ -1133,7 +1133,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
     try {
       // Check if flyer already exists by flyerRunId
       const existingFlyer = await Flyer.findOne({
-        where: { flyerRunId: flyerData.flyer_run_id }
+        where: { flyerRunId: String(flyerData.flyer_run_id) }
       });
 
       if (existingFlyer) {
@@ -1162,7 +1162,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
           storeId: null,
           storeName: sanitizedMerchant,
           storeSlug: flyerData.merchant_slug,
-          flyerRunId: flyerData.flyer_run_id,
+          flyerRunId: String(flyerData.flyer_run_id),
           flyerName: flyerData.name,
           zipCode: sanitizedZipCode || '00000',
           validFrom: safeParseDate(flyerData.valid_from, 0),
@@ -1198,7 +1198,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         storeId,
         storeName: sanitizedMerchant,
         storeSlug: flyerData.merchant_slug,
-        flyerRunId: flyerData.flyer_run_id,
+        flyerRunId: String(flyerData.flyer_run_id),
         flyerName: flyerData.name,
         zipCode: sanitizedZipCode,
         validFrom: safeParseDate(flyerData.valid_from, 0),
@@ -1410,7 +1410,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         try {
           // Check if flyer already exists
           const existingFlyer = await Flyer.findOne({
-            where: { flyerRunId: flyerData.flyer_run_id }
+            where: { flyerRunId: String(flyerData.flyer_run_id) }
           });
 
           if (existingFlyer) {
