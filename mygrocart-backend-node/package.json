@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon -r dotenv/config server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "test:scraper": "node test_scraper.js",
     "test:scraper:standalone": "node test_scraper_standalone.js",
     "test:cache": "node test_redis_caching.js",
@@ -74,6 +76,8 @@
     "uuid": "^11.0.4"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10"
   },
   "engines": {

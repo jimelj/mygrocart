@@ -9,6 +9,8 @@ const { Op, fn, col, literal } = require('sequelize');
 const User = require('../models/User');
 const { Product, StorePrice, Store, Flyer, Deal, UserListItem, UserNotification } = require('../models');
 const { enrichWithStoreBrandInfo } = require('../utils/StoreBrandMatcher');
+const { getOptimizedFlyerUrls, getFlyerThumbnailUrls } = require('../utils/cloudinary');
+const { calculateSavingsPercent, calculateSavingsAmount, parseMultiBuyDeal, calculateBOGOPrice } = require('../utils/dealCalculator');
 
 // Import services
 const DynamicPriceDiscoveryService = require('../services/DynamicPriceDiscoveryService');
@@ -773,7 +775,14 @@ const resolvers = {
           ]
         });
 
-        return flyer ? flyer.get({ plain: true }) : null;
+        if (!flyer) return null;
+
+        const plainFlyer = flyer.get({ plain: true });
+        return {
+          ...plainFlyer,
+          // Apply Cloudinary transformations for optimized delivery
+          imageUrls: plainFlyer.imageUrls ? getOptimizedFlyerUrls(plainFlyer.imageUrls) : []
+        };
       } catch (error) {
         // Log detailed error internally
         console.error('[getFlyer] Error:', error.message, error.stack);
@@ -818,7 +827,9 @@ const resolvers = {
           const plainFlyer = flyer.get({ plain: true });
           return {
             ...plainFlyer,
-            status: statusMap[plainFlyer.status?.toLowerCase()] || 'COMPLETED'
+            status: statusMap[plainFlyer.status?.toLowerCase()] || 'COMPLETED',
+            // Apply Cloudinary transformations for optimized delivery
+            imageUrls: plainFlyer.imageUrls ? getOptimizedFlyerUrls(plainFlyer.imageUrls) : []
           };
         });
       } catch (error) {
