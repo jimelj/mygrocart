@@ -1,254 +1,215 @@
 /**
  * FoodDepotFlyerScraper
  *
- * Fetches Food Depot weekly ad flyer pages for stores near a given ZIP code.
- * Returns flyer objects compatible with FlyerService.saveFlyer() format.
+ * Fetches Food Depot weekly ad data using the Flipp Enterprise API.
+ * Food Depot's site uses a Flipp flyerkit widget with a public access token.
  *
- * Food Depot is a discount grocery chain primarily in Georgia and Alabama.
- * Their weekly ads are published on their website and through third-party
- * flyer aggregators.
+ * Access token: 32f09b3d4ec0fe31895bbfa7a048d0f1
+ * Merchant slug: fooddepot
+ * Nearest store to ZIP 30132: store_code 51 (Dallas, GA)
  */
 
 const axios = require('axios');
 
-// Known Food Depot store locations near Dallas, GA (ZIP 30132)
-const FOOD_DEPOT_STORES_NEAR_30132 = [
-  {
-    storeId: 'food-depot-dallas-ga-01',
-    name: 'Food Depot',
-    address: '154 W Memorial Dr',
-    city: 'Dallas',
-    state: 'GA',
-    zipCode: '30132',
-    latitude: 33.9237,
-    longitude: -84.8407,
-    storeNum: '11'
-  },
-  {
-    storeId: 'food-depot-hiram-ga-01',
-    name: 'Food Depot',
-    address: '4355 Jimmy Lee Smith Pkwy',
-    city: 'Hiram',
-    state: 'GA',
-    zipCode: '30141',
-    latitude: 33.8753,
-    longitude: -84.7634,
-    storeNum: '23'
-  }
+const FLIPP_API_BASE = 'https://dam.flippenterprise.net/flyerkit';
+const FLIPP_ACCESS_TOKEN = '32f09b3d4ec0fe31895bbfa7a048d0f1';
+
+// Known Food Depot stores near ZIP 30132
+const FOOD_DEPOT_STORES = [
+  { storeCode: '51', name: 'Dallas', zipCode: '30157', address: '2985 Villa Rica Hwy, Dallas, GA' },
+  { storeCode: '23', name: 'Hiram', zipCode: '30141', address: '4355 Jimmy Lee Smith Pkwy, Hiram, GA' }
 ];
 
-// Food Depot's website
-const FOOD_DEPOT_BASE_URL = 'https://www.fooddepot.com';
-
-// Alternative: Food Depot flyers often appear on WeeklyAds2 or Flipp
-const FLIPP_API_BASE = 'https://dam.flippenterprise.net';
-
 class FoodDepotFlyerScraper {
-  /**
-   * @param {object} options
-   * @param {number} options.rateLimitMs - Minimum ms between requests (default 2000)
-   */
   constructor(options = {}) {
-    this.rateLimitMs = options.rateLimitMs || 2000;
+    this.rateLimitMs = options.rateLimitMs || 1500;
 
     this.httpClient = axios.create({
       timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MyGroCart/1.0; +https://mygrocart.com)',
-        'Accept': 'application/json, text/html, */*'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'application/json'
       }
     });
   }
 
-  /**
-   * Sleep for rateLimitMs milliseconds.
-   */
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms || this.rateLimitMs));
   }
 
-  /**
-   * Get Food Depot store locations near a ZIP code.
-   * Returns hardcoded list for the Atlanta pilot.
-   *
-   * @param {string} zipCode
-   * @returns {Promise<Array>} Array of store location objects
-   */
   async getStoreLocations(zipCode) {
     console.log(`[FoodDepotFlyerScraper] Looking up Food Depot stores near ZIP ${zipCode}...`);
-
-    const stores = FOOD_DEPOT_STORES_NEAR_30132.filter(store => {
-      return store.zipCode === zipCode || store.state === 'GA';
-    });
-
-    if (stores.length > 0) {
-      console.log(`[FoodDepotFlyerScraper] Found ${stores.length} Food Depot location(s) near ZIP ${zipCode}`);
-      return stores;
-    }
-
-    console.log(`[FoodDepotFlyerScraper] No exact match, returning all known Food Depot stores`);
-    return FOOD_DEPOT_STORES_NEAR_30132;
+    // Return the nearest store
+    const store = FOOD_DEPOT_STORES.find(s => s.zipCode === zipCode) || FOOD_DEPOT_STORES[0];
+    console.log(`[FoodDepotFlyerScraper] Using store: ${store.name} (code ${store.storeCode})`);
+    return [store];
   }
 
   /**
-   * Attempt to fetch flyer metadata from the Food Depot website.
-   * Food Depot uses Flipp for their digital flyer distribution.
-   *
-   * @param {object} store - Store object
-   * @param {string} zipCode - Target ZIP code
-   * @returns {Promise<object|null>} Parsed flyer metadata or null
+   * Fetch current Food Depot publications from Flipp API.
    */
-  async fetchFlyerMetaFromWebsite(store, zipCode) {
+  async fetchPublications(store) {
     try {
-      // Food Depot weekly ad page
-      const weeklyAdUrl = `${FOOD_DEPOT_BASE_URL}/weekly-ad`;
-      const response = await this.httpClient.get(weeklyAdUrl, {
-        timeout: 10000,
-        params: { store: store.storeNum }
+      const response = await this.httpClient.get(`${FLIPP_API_BASE}/publications/fooddepot`, {
+        params: {
+          'languages[]': 'en',
+          locale: 'en',
+          access_token: FLIPP_ACCESS_TOKEN,
+          show_storefronts: true,
+          postal_code: store.zipCode,
+          store_code: store.storeCode
+        }
       });
 
-      // Parse the response to extract flyer embed info (Flipp widget data)
-      const html = response.data;
-
-      // Look for Flipp embed data in the page
-      const flippMatch = html.match(/flipp[^"]*"([^"]+flipp[^"]+)"/i);
-      if (flippMatch) {
-        return { flyerProvider: 'flipp', flyerUrl: flippMatch[1] };
+      const pubs = response.data;
+      if (!Array.isArray(pubs) || pubs.length === 0) {
+        console.log(`[FoodDepotFlyerScraper] No publications found`);
+        return [];
       }
 
-      // Look for direct image URL patterns
-      const imageMatch = html.match(/https?:\/\/[^"'\s]+\.(jpg|png|webp)/gi);
-      if (imageMatch && imageMatch.length > 0) {
-        return { imageUrls: imageMatch.slice(0, 20) };
-      }
-
-      return null;
+      console.log(`[FoodDepotFlyerScraper] Found ${pubs.length} publication(s)`);
+      return pubs;
     } catch (err) {
-      // Website may be inaccessible; not fatal
-      return null;
+      console.error(`[FoodDepotFlyerScraper] Publications API error: ${err.message}`);
+      return [];
     }
   }
 
   /**
-   * Build flyer page URLs using the Flipp CDN pattern.
-   * Food Depot flyers are distributed via Flipp, which uses a predictable CDN structure.
-   *
-   * @param {object} store - Store object
-   * @param {string} validFromStr - YYYY-MM-DD string
-   * @returns {Array<string>} Array of page image URLs
+   * Fetch all deal products from a Food Depot publication.
    */
-  buildFlippImageUrls(store, validFromStr) {
-    const dateSlug = validFromStr.replace(/-/g, '');
-
-    // Flipp CDN pattern for Food Depot flyers
-    // Pattern: https://dam.flippenterprise.net/flyerkit/publications/food-depot/{flyerId}/page-{n}.jpg
-    // Since the flyerId is dynamic, we construct a date-based approximation.
-    const pageCount = 12; // Food Depot typically has 12 pages per weekly ad
-    const imageUrls = [];
-
-    for (let page = 1; page <= pageCount; page++) {
-      imageUrls.push(
-        `https://dam.flippenterprise.net/flyerkit/publications/food-depot-${dateSlug}/public/page-${page}.jpg`
+  async fetchPublicationProducts(publicationId) {
+    try {
+      const response = await this.httpClient.get(
+        `${FLIPP_API_BASE}/publication/${publicationId}/products`,
+        {
+          params: {
+            display_type: 'all',
+            locale: 'en',
+            access_token: FLIPP_ACCESS_TOKEN
+          }
+        }
       );
-    }
 
-    // Also include Food Depot's own CDN as fallback
-    for (let page = 1; page <= pageCount; page++) {
-      imageUrls.push(
-        `${FOOD_DEPOT_BASE_URL}/images/weekly-ad/${dateSlug}/page-${page}.jpg`
-      );
+      return response.data || [];
+    } catch (err) {
+      console.error(`[FoodDepotFlyerScraper] Products API error for pub ${publicationId}: ${err.message}`);
+      return [];
     }
-
-    return imageUrls;
   }
 
-  /**
-   * Fetch flyer for a specific Food Depot store.
-   *
-   * @param {object} store - Store object from getStoreLocations()
-   * @param {string} zipCode - Target ZIP code
-   * @returns {Promise<object|null>} Flyer object or null
-   */
   async fetchFlyerForStore(store, zipCode) {
     try {
-      console.log(
-        `[FoodDepotFlyerScraper] Fetching weekly ad for Food Depot at ${store.address}, ${store.city}, ${store.state}...`
-      );
+      console.log(`[FoodDepotFlyerScraper] Fetching Food Depot weekly ad via Flipp for store ${store.name}...`);
 
       await this.delay();
 
-      // Food Depot weekly ads run Wednesday to Tuesday (same as most grocery chains)
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToLastWed = (dayOfWeek + 4) % 7;
-      const validFrom = new Date(now);
-      validFrom.setDate(now.getDate() - daysToLastWed);
-      validFrom.setHours(0, 0, 0, 0);
-      const validTo = new Date(validFrom);
-      validTo.setDate(validFrom.getDate() + 6);
-      validTo.setHours(23, 59, 59, 999);
+      // Step 1: Get current publications
+      const publications = await this.fetchPublications(store);
+      if (publications.length === 0) return null;
 
-      const validFromStr = validFrom.toISOString().split('T')[0];
-      const validToStr = validTo.toISOString().split('T')[0];
+      const pub = publications[0];
+      const publicationId = pub.id;
 
-      // Try to fetch live flyer metadata from website
-      const liveMeta = await this.fetchFlyerMetaFromWebsite(store, zipCode);
+      console.log(`[FoodDepotFlyerScraper] Publication ID: ${publicationId}, valid: ${pub.valid_from} to ${pub.valid_to}`);
 
-      let imageUrls;
-      if (liveMeta && liveMeta.imageUrls && liveMeta.imageUrls.length > 0) {
-        imageUrls = liveMeta.imageUrls;
-        console.log(`[FoodDepotFlyerScraper] Got ${imageUrls.length} image URLs from website for store ${store.storeNum}`);
-      } else {
-        // Fall back to constructed CDN URLs
-        imageUrls = this.buildFlippImageUrls(store, validFromStr);
-        console.log(`[FoodDepotFlyerScraper] Using CDN pattern URLs (${imageUrls.length} pages) for store ${store.storeNum}`);
+      await this.delay();
+
+      // Step 2: Fetch structured deal products
+      const products = await this.fetchPublicationProducts(publicationId);
+      console.log(`[FoodDepotFlyerScraper] Got ${products.length} products from Flipp`);
+
+      // Extract deals
+      const deals = [];
+      const imageUrls = [];
+
+      for (const product of products) {
+        let salePrice = null;
+        const priceText = product.price_text || '';
+        const priceMatch = priceText.match(/\$?([\d]+\.[\d]{2})/);
+        if (priceMatch) {
+          salePrice = parseFloat(priceMatch[1]);
+        }
+
+        let regularPrice = null;
+        if (product.original_price) {
+          const origMatch = String(product.original_price).match(/\$?([\d]+\.[\d]{2})/);
+          if (origMatch) regularPrice = parseFloat(origMatch[1]);
+        }
+
+        const deal = {
+          productName: product.name || '',
+          productBrand: product.brand || null,
+          salePrice,
+          regularPrice,
+          unit: 'each',
+          dealType: 'sale',
+          productCategory: (product.categories || []).join(', ') || null
+        };
+
+        if (deal.productName && deal.salePrice) {
+          deals.push(deal);
+        }
+
+        if (product.image_url) {
+          imageUrls.push(product.image_url);
+        }
       }
+
+      // Build flyer page image URLs if available
+      const flyerPageUrls = [];
+      if (pub.page_count) {
+        for (let i = 1; i <= pub.page_count; i++) {
+          flyerPageUrls.push(
+            `https://f.wishabi.net/page_pdf_images/${publicationId}/${i}/x_large`
+          );
+        }
+      }
+
+      // Also include thumbnail
+      if (pub.first_page_thumbnail_400h_url) {
+        flyerPageUrls.unshift(pub.first_page_thumbnail_400h_url);
+      }
+
+      const finalImageUrls = flyerPageUrls.length > 0 ? flyerPageUrls : imageUrls.slice(0, 20);
+
+      const validFromStr = pub.valid_from
+        ? new Date(pub.valid_from).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      const validToStr = pub.valid_to
+        ? new Date(pub.valid_to).toISOString().split('T')[0]
+        : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+      console.log(`[FoodDepotFlyerScraper] Extracted ${deals.length} deals for Food Depot`);
 
       return {
         storeName: 'Food Depot',
         storeSlug: 'food-depot',
-        flyerName: 'Weekly Ad',
-        imageUrls,
+        flyerName: pub.name || 'Weekly Ad',
+        imageUrls: finalImageUrls,
         validFrom: validFromStr,
         validTo: validToStr,
         zipCode,
-        source: 'direct_scrape',
-        storeAddress: store.address,
-        storeCity: store.city,
-        storeState: store.state,
-        storeLatitude: store.latitude,
-        storeLongitude: store.longitude,
-        foodDepotStoreNum: store.storeNum
+        source: 'flipp_api',
+        preExtractedDeals: deals,
+        flippPublicationId: publicationId
       };
     } catch (error) {
-      console.error(
-        `[FoodDepotFlyerScraper] Failed to fetch flyer for Food Depot at ${store.address}: ${error.message}`
-      );
+      console.error(`[FoodDepotFlyerScraper] Failed to fetch Food Depot flyer: ${error.message}`);
       return null;
     }
   }
 
-  /**
-   * Fetch all Food Depot flyers for stores near a ZIP code.
-   *
-   * @param {string} zipCode - 5-digit ZIP code
-   * @returns {Promise<Array>} Array of flyer objects compatible with FlyerService
-   */
   async fetchFlyers(zipCode) {
     console.log(`[FoodDepotFlyerScraper] Starting flyer fetch for ZIP ${zipCode}...`);
 
     const stores = await this.getStoreLocations(zipCode);
-    const flyers = [];
+    if (stores.length === 0) return [];
 
-    for (const store of stores) {
-      const flyer = await this.fetchFlyerForStore(store, zipCode);
-      if (flyer) {
-        flyers.push(flyer);
-      }
-      await this.delay();
-    }
+    const flyer = await this.fetchFlyerForStore(stores[0], zipCode);
+    const flyers = flyer ? [flyer] : [];
 
-    console.log(`[FoodDepotFlyerScraper] Fetched ${flyers.length} flyer(s) for ZIP ${zipCode}`);
+    console.log(`[FoodDepotFlyerScraper] Fetched ${flyers.length} flyer(s) with ${flyer?.preExtractedDeals?.length || 0} deals for ZIP ${zipCode}`);
     return flyers;
   }
 }
