@@ -13,6 +13,10 @@
 const KrogerFlyerScraper = require('./KrogerFlyerScraper');
 const PublixFlyerScraper = require('./PublixFlyerScraper');
 const FoodDepotFlyerScraper = require('./FoodDepotFlyerScraper');
+const LidlFlyerScraper = require('./LidlFlyerScraper');
+const AldiFlyerScraper = require('./AldiFlyerScraper');
+const FoodLionFlyerScraper = require('./FoodLionFlyerScraper');
+const WegmansFlyerScraper = require('./WegmansFlyerScraper');
 
 /**
  * ScraperRegistry maps store slugs to their scraper classes.
@@ -26,7 +30,11 @@ const FoodDepotFlyerScraper = require('./FoodDepotFlyerScraper');
 const ScraperRegistry = {
   kroger: KrogerFlyerScraper,
   publix: PublixFlyerScraper,
-  'food-depot': FoodDepotFlyerScraper
+  'food-depot': FoodDepotFlyerScraper,
+  lidl: LidlFlyerScraper,
+  aldi: AldiFlyerScraper,
+  'food-lion': FoodLionFlyerScraper,
+  wegmans: WegmansFlyerScraper
 };
 
 /**
@@ -82,6 +90,10 @@ module.exports = {
   KrogerFlyerScraper,
   PublixFlyerScraper,
   FoodDepotFlyerScraper,
+  LidlFlyerScraper,
+  AldiFlyerScraper,
+  FoodLionFlyerScraper,
+  WegmansFlyerScraper,
   ScraperRegistry,
   getScraperForStore,
   fetchAllStoreFlyers
