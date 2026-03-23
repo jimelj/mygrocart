@@ -34,7 +34,7 @@ export default function ProfileScreen({ navigation }: any) {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          <Ionicons name="person-circle" size={80} color="#16A34A" />
+          <Ionicons name="person-circle" size={80} color="#367723" />
         </View>
         <Text style={styles.userName}>{user.name}</Text>
         <Text style={styles.userEmail}>{user.email}</Text>

@@ -509,6 +509,17 @@ const typeDefs = gql`
 
     # Force re-process all flyers for a ZIP code (deletes and re-fetches with new quality settings)
     reprocessFlyers(zipCode: String!): FlyerReprocessResult!
+
+    # Directly upload a flyer with known image URLs (admin only)
+    # Used by direct store scrapers (Kroger, Publix, Food Depot) for the Atlanta pilot
+    uploadFlyer(
+      storeName: String!
+      zipCode: String!
+      imageUrls: [String!]!
+      validFrom: String!
+      validTo: String!
+      flyerName: String
+    ): Flyer
   }
 
   type FlyerReprocessResult {

@@ -18,7 +18,7 @@ export default function AuthStack() {
           fontWeight: '700',
           color: '#111827',
         },
-        headerTintColor: '#16A34A',
+        headerTintColor: '#367723',
         headerShadowVisible: false,
       }}
     >

@@ -58,7 +58,7 @@ export function StorePriceList({
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className={isCheapest ? 'font-semibold text-green-700' : 'text-gray-700'}>
+              <span className={isCheapest ? 'font-semibold text-primary-700' : 'text-gray-700'}>
                 {sp.store.chainName}
               </span>
               {showDealBadge && sp.dealType && sp.dealType !== 'regular' && (
@@ -72,12 +72,12 @@ export function StorePriceList({
             </div>
             <div className="flex items-center gap-1">
               <span className={`font-bold ${
-                isCheapest ? 'text-green-600 text-lg' : 'text-gray-900'
+                isCheapest ? 'text-primary-600 text-lg' : 'text-gray-900'
               }`}>
                 ${price.toFixed(2)}
               </span>
               {isCheapest && variant === 'default' && (
-                <span className="text-xs text-green-600 font-medium ml-1">
+                <span className="text-xs text-primary-600 font-medium ml-1">
                   (Cheapest!)
                 </span>
               )}

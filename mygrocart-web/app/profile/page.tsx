@@ -67,7 +67,7 @@ export default function ProfilePage() {
             <AlertDescription className="text-center">
               <p className="mb-4">Please sign in to view your profile</p>
               <Link href="/login?returnUrl=/profile">
-                <Button className="bg-green-600 hover:bg-green-700">
+                <Button className="bg-primary-500 hover:bg-primary-600">
                   Sign In
                 </Button>
               </Link>
@@ -91,7 +91,7 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <User className="h-8 w-8 text-green-600" />
+                <User className="h-8 w-8 text-primary-600" />
                 My Profile
               </h1>
               <p className="mt-2 text-gray-500">
@@ -140,7 +140,7 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5 text-green-600" />
+                <User className="h-5 w-5 text-primary-600" />
                 Account Information
               </CardTitle>
               <CardDescription>Your personal details and account settings</CardDescription>
@@ -168,7 +168,7 @@ export default function ProfilePage() {
                     <p className="text-base font-semibold text-gray-900">{user.email}</p>
                   </div>
                 </div>
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <Badge variant="outline" className="bg-primary-50 text-primary-700 border-primary-200">
                   Verified
                 </Badge>
               </div>
@@ -205,7 +205,7 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-green-600" />
+                <MapPin className="h-5 w-5 text-primary-600" />
                 Location Settings
               </CardTitle>
               <CardDescription>Manage your location preferences for store searches</CardDescription>
@@ -321,7 +321,7 @@ export default function ProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5 text-green-600" />
+                <ShoppingCart className="h-5 w-5 text-primary-600" />
                 Quick Actions
               </CardTitle>
               <CardDescription>Navigate to your shopping features</CardDescription>
@@ -329,7 +329,7 @@ export default function ProfilePage() {
             <CardContent className="space-y-3">
               <Link href="/list">
                 <Button className="w-full justify-start bg-white hover:bg-gray-50 text-gray-900 border border-gray-200" variant="outline">
-                  <ShoppingCart className="mr-3 h-5 w-5 text-green-600" />
+                  <ShoppingCart className="mr-3 h-5 w-5 text-primary-600" />
                   View Shopping List
                 </Button>
               </Link>

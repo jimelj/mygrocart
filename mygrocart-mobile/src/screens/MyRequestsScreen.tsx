@@ -20,7 +20,7 @@ export default function MyRequestsScreen() {
   if (loading && !data) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#367723" />
         <Text style={styles.loadingText}>Loading requests...</Text>
       </View>
     );
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   completedDate: {
     fontSize: 12,
-    color: '#16A34A',
+    color: '#367723',
     fontWeight: '500',
   },
   statusBadge: {

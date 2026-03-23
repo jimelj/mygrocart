@@ -170,7 +170,7 @@ export default function ShoppingListPage() {
       <div className="min-h-screen bg-gray-50">
         <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
             <p className="text-gray-600">Loading your shopping list...</p>
           </div>
         </main>
@@ -190,7 +190,7 @@ export default function ShoppingListPage() {
             </div>
             <p className="text-xl font-semibold text-gray-900 mb-2">Error Loading List</p>
             <p className="text-gray-600 mb-4">{error.message}</p>
-            <Button onClick={() => refetch()} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={() => refetch()} className="bg-primary-500 hover:bg-primary-600">
               Try Again
             </Button>
           </div>
@@ -205,7 +205,7 @@ export default function ShoppingListPage() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <ShoppingCart className="w-6 h-6 text-green-600" />
+            <ShoppingCart className="w-6 h-6 text-primary-600" />
             <h1 className="text-3xl font-bold text-gray-900">Shopping List</h1>
           </div>
           <p className="text-gray-600">
@@ -242,7 +242,7 @@ export default function ShoppingListPage() {
                 </CardTitle>
                 {listItems.length > 0 && totalMatchedDeals > 0 && (
                   <Link href="/deals/matches">
-                    <Button className="bg-green-600 hover:bg-green-700">
+                    <Button className="bg-primary-500 hover:bg-primary-600">
                       <Tag className="w-4 h-4 mr-2" />
                       View All Deals
                     </Button>
@@ -373,7 +373,7 @@ export default function ShoppingListPage() {
                                     <p className="text-xs text-gray-500">{deal.storeName}</p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-lg font-bold text-green-600">
+                                    <p className="text-lg font-bold text-primary-600">
                                       ${deal.salePrice.toFixed(2)}
                                     </p>
                                     {deal.regularPrice && deal.savingsPercent && (
@@ -395,7 +395,7 @@ export default function ShoppingListPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="w-full mt-3 text-green-600 border-green-600 hover:bg-green-50"
+                                  className="w-full mt-3 text-primary-600 border-primary-600 hover:bg-primary-50"
                                 >
                                   View all {dealCount} deals
                                 </Button>
@@ -441,7 +441,7 @@ export default function ShoppingListPage() {
 
           {/* Call-to-Action Section */}
           {listItems.length > 0 && totalMatchedDeals > 0 && (
-            <div className="p-6 bg-gradient-to-r from-green-50 to-orange-50 border border-green-200 rounded-lg">
+            <div className="p-6 bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-gray-900 mb-1">
@@ -452,7 +452,7 @@ export default function ShoppingListPage() {
                   </p>
                 </div>
                 <Link href="/deals/matches">
-                  <Button className="bg-green-600 hover:bg-green-700 shadow-md">
+                  <Button className="bg-primary-500 hover:bg-primary-600 shadow-md">
                     <Tag className="w-4 h-4 mr-2" />
                     View Matched Deals
                   </Button>

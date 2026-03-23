@@ -3,6 +3,7 @@ const { Flyer, Deal, Store } = require('../models');
 const { Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 const OpenAI = require('openai');
+const { fetchAllStoreFlyers } = require('./scrapers');
 const cloudinary = require('cloudinary').v2;
 const pLimit = require('p-limit');
 const sharp = require('sharp');
@@ -29,12 +30,15 @@ const safeParseDate = (timestamp, fallbackDays = 0) => {
 };
 
 /**
- * FlyerService - Handles flyer ingestion from WeeklyAds2 API
+ * FlyerService - Handles flyer ingestion from multiple sources
+ *
+ * Primary source: Direct store scrapers (Kroger, Publix, Food Depot)
+ * Supplemental: WeeklyAds2 API (for additional stores like Lidl, ALDI, etc.)
  *
  * This service:
- * 1. Fetches flyers for a ZIP code from WeeklyAds2 API
- * 2. Filters to only grocery stores
- * 3. Downloads flyer images from CDN
+ * 1. Fetches flyers from direct store scrapers (high quality)
+ * 2. Supplements with WeeklyAds2 API for broader coverage
+ * 3. Downloads flyer images from store CDNs
  * 4. Uploads images to Cloudinary
  * 5. Processes flyers with OCR (GPT-4o Mini)
  * 6. Saves flyers and deals to database
@@ -49,23 +53,20 @@ class FlyerService {
       ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
       : null;
 
-    // Grocery stores we support (based on research)
+    // Grocery stores we support (WeeklyAds2 slug filter)
+    // Atlanta pilot stores + supplemental chains
     this.GROCERY_STORES = [
-      'target',
-      'walmart',
-      'shoprite',
-      'stop-shop',
-      'acme-markets',
+      'kroger',
+      'publix',
+      'food-depot',
       'aldi',
       'lidl',
-      'costco',
-      'food-bazaar-supermarket',
-      'kings-food-markets',
-      'western-beef',
-      'wegmans',
-      'giant-food',
       'food-lion',
-      'publix'
+      'walmart',
+      'costco',
+      'wegmans',
+      'target',
+      'giant-food'
     ];
 
     // Rate limiting: 1 request per second to be polite
@@ -1250,6 +1251,104 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
   }
 
   /**
+   * Fetch flyers using direct store scrapers (Kroger, Publix, Food Depot).
+   * These scrape flyer images directly from store sources for higher quality.
+   *
+   * @param {string} zipCode - 5-digit ZIP code
+   * @returns {Promise<Array>} Array of scraper flyer objects
+   */
+  async fetchFlyersFromScrapers(zipCode) {
+    try {
+      console.log(`[FlyerService] Fetching flyers from direct store scrapers for ZIP ${zipCode}...`);
+      const flyers = await fetchAllStoreFlyers(zipCode, { rateLimitMs: 1500 });
+      console.log(`[FlyerService] Direct scrapers returned ${flyers.length} flyer(s) for ZIP ${zipCode}`);
+      return flyers;
+    } catch (error) {
+      console.error(`[FlyerService] Direct scraper error for ZIP ${zipCode}:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Process a single flyer from a direct store scraper.
+   * Downloads images from store CDN, uploads to Cloudinary, runs OCR.
+   *
+   * @param {object} scraperFlyer - Flyer object from a direct scraper
+   * @returns {Promise<object>} Processing result { success, dealsCount }
+   */
+  async processScraperFlyer(scraperFlyer) {
+    try {
+      // Generate a unique flyerRunId from scraper data
+      const flyerRunId = `${scraperFlyer.storeSlug}-${scraperFlyer.zipCode}-${scraperFlyer.validFrom}`;
+
+      // Check if already processed
+      const existingFlyer = await Flyer.findOne({
+        where: { flyerRunId }
+      });
+
+      if (existingFlyer) {
+        console.log(`[FlyerService] Scraper flyer ${flyerRunId} already exists - skipping`);
+        return { success: true, dealsCount: 0, skipped: true };
+      }
+
+      console.log(`[FlyerService] Processing scraper flyer: ${scraperFlyer.storeName} (${flyerRunId})`);
+
+      // Download images from store CDN URLs — filter out any that 404
+      const validImageUrls = [];
+      for (const url of scraperFlyer.imageUrls) {
+        try {
+          const response = await axios.head(url, { timeout: 5000 });
+          if (response.status === 200) {
+            validImageUrls.push(url);
+          }
+        } catch {
+          // Image doesn't exist at this URL - skip it
+        }
+        await this.delay(300); // Small delay between HEAD requests
+      }
+
+      if (validImageUrls.length === 0) {
+        console.warn(`[FlyerService] No valid images found for ${scraperFlyer.storeName} flyer`);
+        return { success: false, dealsCount: 0, error: 'No valid images found' };
+      }
+
+      console.log(`[FlyerService] Found ${validImageUrls.length}/${scraperFlyer.imageUrls.length} valid image URLs for ${scraperFlyer.storeName}`);
+
+      // Upload to Cloudinary
+      const cloudinaryUrls = await this.uploadToCloudinary(validImageUrls, flyerRunId);
+
+      // Extract deals with OCR
+      const deals = await this.extractDealsWithOCR(cloudinaryUrls);
+
+      // Enrich deals with product images
+      const enrichedDeals = await this.enrichDealsWithImages(deals);
+
+      // Save to database using the standard saveFlyer method
+      // Convert scraper format to the format saveFlyer expects
+      const flyerData = {
+        flyer_run_id: flyerRunId,
+        merchant: scraperFlyer.storeName,
+        merchant_slug: scraperFlyer.storeSlug,
+        name: scraperFlyer.flyerName || 'Weekly Ad',
+        postal_code: scraperFlyer.zipCode,
+        valid_from: new Date(scraperFlyer.validFrom).getTime() / 1000,
+        valid_to: new Date(scraperFlyer.validTo).getTime() / 1000,
+        imageUrls: cloudinaryUrls,
+        flyerPath: null, // No tile path for direct scrapers
+        source: 'direct_scrape'
+      };
+
+      await this.saveFlyer(flyerData, enrichedDeals);
+
+      console.log(`[FlyerService] Saved scraper flyer ${flyerRunId}: ${enrichedDeals.length} deals`);
+      return { success: true, dealsCount: enrichedDeals.length, skipped: false };
+    } catch (error) {
+      console.error(`[FlyerService] Error processing scraper flyer for ${scraperFlyer.storeName}:`, error.message);
+      return { success: false, dealsCount: 0, error: error.message };
+    }
+  }
+
+  /**
    * Main method: Process all flyers for a ZIP code
    * This is the primary entry point for flyer ingestion
    *
@@ -1261,7 +1360,29 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
       try {
         console.log(`[FlyerService] Processing ZIP code ${zipCode}...`);
 
-      // Step 1: Fetch flyers from WeeklyAds2
+      // Step 0: Try direct store scrapers first (higher quality, no WeeklyAds2 dependency)
+      const scraperFlyers = await this.fetchFlyersFromScrapers(zipCode);
+      let scraperDeals = 0;
+      let scraperProcessed = 0;
+
+      if (scraperFlyers.length > 0) {
+        console.log(`[FlyerService] Processing ${scraperFlyers.length} flyer(s) from direct store scrapers...`);
+        for (const scraperFlyer of scraperFlyers) {
+          try {
+            const result = await this.processScraperFlyer(scraperFlyer);
+            if (result.success && !result.skipped) {
+              scraperProcessed++;
+              scraperDeals += result.dealsCount;
+            }
+          } catch (err) {
+            console.error(`[FlyerService] Scraper flyer processing error:`, err.message);
+          }
+          await this.delay(this.requestDelay);
+        }
+        console.log(`[FlyerService] Direct scrapers: ${scraperProcessed} new flyers, ${scraperDeals} deals`);
+      }
+
+      // Step 1: Also fetch flyers from WeeklyAds2 as supplemental source
       const allFlyers = await this.fetchFlyersForZip(zipCode);
 
       // Step 2: Filter to grocery stores
@@ -1331,14 +1452,21 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
 
       console.log(`[FlyerService] Completed processing ZIP ${zipCode}: ${flyersProcessed} flyers, ${newFlyers} new, ${totalDeals} deals`);
 
+      const totalFlyersProcessed = flyersProcessed + scraperProcessed;
+      const totalNewFlyers = newFlyers + scraperProcessed;
+      const allDeals = totalDeals + scraperDeals;
+
       return {
         success: true,
         zipCode,
-        flyersFound: groceryFlyers.length,
-        flyersProcessed,
-        newFlyers,
-        totalDeals,
-        message: `Successfully processed ${flyersProcessed} flyers (${newFlyers} new) with ${totalDeals} deals`
+        flyersFound: groceryFlyers.length + scraperFlyers.length,
+        flyersProcessed: totalFlyersProcessed,
+        newFlyers: totalNewFlyers,
+        totalDeals: allDeals,
+        scraperFlyers: scraperProcessed,
+        scraperDeals,
+        weeklyAds2Flyers: newFlyers,
+        message: `Processed ${totalFlyersProcessed} flyers (${scraperProcessed} direct + ${newFlyers} WeeklyAds2) with ${allDeals} deals`
       };
     } catch (error) {
       console.error(`[FlyerService] Error processing ZIP code ${zipCode}:`, error.message);

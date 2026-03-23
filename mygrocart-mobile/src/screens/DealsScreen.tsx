@@ -45,7 +45,7 @@ export default function DealsScreen() {
   if (loading && !data) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#367723" />
         <Text style={styles.loadingText}>Loading deals...</Text>
       </View>
     );

@@ -65,7 +65,7 @@ export default function MatchedDealsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function MatchedDealsPage() {
                 Add items to your shopping list to find matching deals from local flyers.
               </p>
               <Link href="/list">
-                <Button className="bg-green-600 hover:bg-green-700">
+                <Button className="bg-primary-500 hover:bg-primary-600">
                   Go to Shopping List
                 </Button>
               </Link>
@@ -158,7 +158,7 @@ export default function MatchedDealsPage() {
             {groupedItems.map(({ listItem, deals }) => (
               <Card key={listItem.id} className="overflow-hidden">
                 {/* List item header */}
-                <div className="bg-green-50 px-6 py-4 border-b">
+                <div className="bg-primary-50 px-6 py-4 border-b">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900">
@@ -197,7 +197,7 @@ export default function MatchedDealsPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-green-600">
+                          <p className="text-2xl font-bold text-primary-600">
                             ${match.deal.salePrice.toFixed(2)}
                           </p>
                           {match.deal.regularPrice && (
@@ -223,7 +223,7 @@ export default function MatchedDealsPage() {
 
         {/* Summary card */}
         {!loading && !error && matches.length > 0 && (
-          <Card className="mt-8 bg-gradient-to-r from-green-50 to-orange-50 border-green-200">
+          <Card className="mt-8 bg-gradient-to-r from-primary-50 to-secondary-50 border-primary-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -235,7 +235,7 @@ export default function MatchedDealsPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-green-600">
+                  <p className="text-3xl font-bold text-primary-600">
                     ${matches.reduce((sum, m) => sum + (m.deal.savings || 0), 0).toFixed(2)}
                   </p>
                   <p className="text-sm text-gray-500">estimated savings</p>

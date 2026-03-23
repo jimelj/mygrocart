@@ -56,13 +56,13 @@ function ToastItem({
   }, [toast.duration, onDismiss]);
 
   const bgColor = isSuccess
-    ? 'bg-green-50 border-green-200'
+    ? 'bg-primary-50 border-primary-200'
     : isDestructive
     ? 'bg-red-50 border-red-200'
     : 'bg-white border-gray-200';
 
   const iconColor = isSuccess
-    ? 'text-green-600'
+    ? 'text-primary-600'
     : isDestructive
     ? 'text-red-600'
     : 'text-gray-600';

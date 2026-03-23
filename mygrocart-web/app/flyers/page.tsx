@@ -34,7 +34,7 @@ export default function FlyersPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
 
-  const zipCode = user?.zipCode || '07001';
+  const zipCode = user?.zipCode || '30132';
 
   const { data, loading, error } = useQuery<GetCurrentFlyersResponse>(GET_CURRENT_FLYERS, {
     variables: { zipCode },
@@ -51,7 +51,7 @@ export default function FlyersPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -100,7 +100,7 @@ export default function FlyersPage() {
 
         {loading && (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Loading flyers...</p>
           </div>
         )}
@@ -217,7 +217,7 @@ export default function FlyersPage() {
                   key={idx}
                   onClick={() => handlePageChange(idx)}
                   className={`flex-shrink-0 w-16 h-20 rounded border-2 overflow-hidden ${
-                    currentPage === idx ? 'border-green-600' : 'border-gray-200'
+                    currentPage === idx ? 'border-primary-600' : 'border-gray-200'
                   }`}
                 >
                   <Image
@@ -259,7 +259,7 @@ export default function FlyersPage() {
                     <span>{flyer.imageUrls?.length || 0} pages</span>
                     <span>{flyer.status}</span>
                   </div>
-                  <Button className="w-full mt-4 bg-green-600 hover:bg-green-700">
+                  <Button className="w-full mt-4 bg-primary-500 hover:bg-primary-600">
                     View Flyer
                   </Button>
                 </CardContent>

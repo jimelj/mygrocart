@@ -114,7 +114,7 @@ export default function ComparisonPage() {
         {/* Loading State */}
         {rankingLoading && (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Finding the best deals for your list...</p>
           </div>
         )}
@@ -129,7 +129,7 @@ export default function ComparisonPage() {
                 Add items to your shopping list to see which stores have the best deals
               </p>
               <Link href="/list">
-                <Button className="bg-green-600 hover:bg-green-700">
+                <Button className="bg-primary-500 hover:bg-primary-600">
                   Add Items to List
                 </Button>
               </Link>
@@ -146,7 +146,7 @@ export default function ComparisonPage() {
               <p className="text-gray-500 mb-4">
                 {result?.message || "We couldn't find any current deals matching your list items"}
               </p>
-              <Button onClick={() => refetch()} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={() => refetch()} className="bg-primary-500 hover:bg-primary-600">
                 Refresh
               </Button>
             </CardContent>
@@ -158,16 +158,16 @@ export default function ComparisonPage() {
           <>
             {/* Summary Banner */}
             {result?.bestStore && rankings.length > 0 && (
-              <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+              <Card className="mb-6 bg-gradient-to-r from-primary-50 to-primary-100 border-primary-200">
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-green-700 font-medium">Lowest Cost Store</p>
-                      <p className="text-2xl font-bold text-green-800">{result.bestStore}</p>
+                      <p className="text-sm text-primary-700 font-medium">Lowest Cost Store</p>
+                      <p className="text-2xl font-bold text-primary-800">{result.bestStore}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-green-700">Total Cost</p>
-                      <p className="text-2xl font-bold text-green-600">
+                      <p className="text-sm text-primary-700">Total Cost</p>
+                      <p className="text-2xl font-bold text-primary-600">
                         ${rankings[0]?.totalCost?.toFixed(2) || '0.00'}
                       </p>
                     </div>
@@ -182,14 +182,14 @@ export default function ComparisonPage() {
                 <Card
                   key={store.storeName}
                   className={`overflow-hidden transition-all ${
-                    store.isBestValue ? 'ring-2 ring-green-500 shadow-lg' : ''
+                    store.isBestValue ? 'ring-2 ring-primary-500 shadow-lg' : ''
                   }`}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                          index === 0 ? 'bg-green-500' : index === 1 ? 'bg-blue-500' : 'bg-gray-400'
+                          index === 0 ? 'bg-primary-500' : index === 1 ? 'bg-blue-500' : 'bg-gray-400'
                         }`}>
                           {index + 1}
                         </div>
@@ -197,7 +197,7 @@ export default function ComparisonPage() {
                           <CardTitle className="text-xl flex items-center gap-2">
                             {store.storeName}
                             {store.isBestValue && (
-                              <Badge className="bg-green-500 hover:bg-green-600">Best Value</Badge>
+                              <Badge className="bg-primary-500 hover:bg-primary-600">Best Value</Badge>
                             )}
                           </CardTitle>
                           <CardDescription>
@@ -224,7 +224,7 @@ export default function ComparisonPage() {
                       <div className="w-full bg-gray-200 rounded-full h-2.5">
                         <div
                           className={`h-2.5 rounded-full ${
-                            store.matchPercentage >= 50 ? 'bg-green-500' : 'bg-yellow-500'
+                            store.matchPercentage >= 50 ? 'bg-primary-500' : 'bg-secondary-500'
                           }`}
                           style={{ width: `${store.matchPercentage}%` }}
                         />
@@ -255,20 +255,20 @@ export default function ComparisonPage() {
                           <div
                             key={dealIndex}
                             className={`flex items-center justify-between p-3 rounded-lg ${
-                              deal.isBestPrice ? 'bg-green-50 border border-green-200' : 'bg-gray-50'
+                              deal.isBestPrice ? 'bg-primary-50 border border-primary-200' : 'bg-gray-50'
                             }`}
                           >
                             <div>
                               <p className="font-medium text-gray-900 flex items-center gap-2">
                                 {deal.listItemName}
                                 {deal.isBestPrice && (
-                                  <Badge className="bg-green-500 text-xs">Best Price</Badge>
+                                  <Badge className="bg-primary-500 text-xs">Best Price</Badge>
                                 )}
                               </p>
                               <p className="text-sm text-gray-500">{deal.dealProductName}</p>
                             </div>
                             <div className="text-right">
-                              <p className={`font-bold ${deal.isBestPrice ? 'text-green-600' : 'text-blue-600'}`}>
+                              <p className={`font-bold ${deal.isBestPrice ? 'text-primary-600' : 'text-blue-600'}`}>
                                 ${deal.salePrice.toFixed(2)}
                               </p>
                               {deal.regularPrice && (
@@ -302,7 +302,7 @@ export default function ComparisonPage() {
               <CardContent>
                 <div className="grid md:grid-cols-3 gap-6">
                   <div className="text-center p-4 bg-white rounded-lg shadow-sm">
-                    <div className="text-3xl font-bold text-green-600 mb-1">
+                    <div className="text-3xl font-bold text-primary-600 mb-1">
                       ${rankings[0]?.totalCost?.toFixed(2) || '0.00'}
                     </div>
                     <div className="text-sm text-gray-600">Lowest Total Cost</div>
@@ -345,7 +345,7 @@ export default function ComparisonPage() {
                 </Button>
               </Link>
               <Link href="/deals/matches">
-                <Button className="bg-green-600 hover:bg-green-700">
+                <Button className="bg-primary-500 hover:bg-primary-600">
                   <Tag className="w-4 h-4 mr-2" />
                   View All Matched Deals
                 </Button>

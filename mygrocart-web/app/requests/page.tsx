@@ -41,7 +41,7 @@ export default function RequestsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p className="text-gray-500">Loading your requests...</p>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function RequestsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-primary-100 text-primary-800 border-primary-200';
       case 'processing':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'failed':
@@ -115,7 +115,7 @@ export default function RequestsPage() {
                   Request products that aren&apos;t in our catalog and we&apos;ll add them within 24 hours.
                 </p>
                 <Link href="/list">
-                  <Button className="bg-green-600 hover:bg-green-700">
+                  <Button className="bg-primary-500 hover:bg-primary-600">
                     Start Shopping
                   </Button>
                 </Link>
@@ -155,7 +155,7 @@ export default function RequestsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-green-600 hover:bg-green-50"
+                          className="text-primary-600 hover:bg-primary-50"
                         >
                           View in Catalog →
                         </Button>

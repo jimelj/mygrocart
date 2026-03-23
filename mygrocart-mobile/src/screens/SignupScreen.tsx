@@ -159,7 +159,7 @@ export default function SignupScreen({ navigation }: any) {
         >
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="cart" size={64} color="#16A34A" />
+              <Ionicons name="cart" size={64} color="#367723" />
             </View>
             <Text style={styles.title}>MyGroCart</Text>
             <Text style={styles.subtitle}>Create Your Account</Text>
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   signupButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   loginLink: {
     fontSize: 14,
-    color: '#16A34A',
+    color: '#367723',
     fontWeight: '600',
   },
 });

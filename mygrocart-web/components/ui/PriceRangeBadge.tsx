@@ -16,7 +16,7 @@ export function PriceRangeBadge({ priceRange, variant = 'default' }: PriceRangeB
   if (variant === 'compact') {
     return (
       <div className="text-sm">
-        <span className="font-semibold text-green-600">
+        <span className="font-semibold text-primary-600">
           ${priceRange.min.toFixed(2)}
         </span>
         {priceRange.max > priceRange.min && (
@@ -31,7 +31,7 @@ export function PriceRangeBadge({ priceRange, variant = 'default' }: PriceRangeB
   return (
     <div className="space-y-1">
       <div className="flex items-baseline gap-2">
-        <span className="text-lg font-bold text-green-600">
+        <span className="text-lg font-bold text-primary-600">
           From ${priceRange.min.toFixed(2)}
         </span>
         {priceRange.storeCount > 1 && (
@@ -41,7 +41,7 @@ export function PriceRangeBadge({ priceRange, variant = 'default' }: PriceRangeB
         )}
       </div>
       {priceRange.savings > 0 && (
-        <div className="text-sm text-green-700 font-medium">
+        <div className="text-sm text-primary-700 font-medium">
           Save up to ${priceRange.savings.toFixed(2)}
         </div>
       )}

@@ -134,7 +134,7 @@ export default function ListScreenNew({ navigation }: any) {
           <Ionicons
             name={item.checked ? 'checkbox' : 'square-outline'}
             size={24}
-            color={item.checked ? '#16A34A' : '#9CA3AF'}
+            color={item.checked ? '#367723' : '#9CA3AF'}
           />
         </TouchableOpacity>
 
@@ -212,7 +212,7 @@ export default function ListScreenNew({ navigation }: any) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#367723" />
         <Text style={styles.loadingText}>Loading your list...</Text>
       </View>
     );
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   addButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,

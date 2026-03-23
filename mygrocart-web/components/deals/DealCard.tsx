@@ -103,7 +103,7 @@ export function DealCard({ deal, onClick, onAddToList, isAdded = false }: DealCa
         <div className="flex items-end justify-between">
           <div className="space-y-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-green-600">
+              <span className="text-2xl font-bold text-primary-600">
                 ${deal.salePrice.toFixed(2)}
               </span>
               {deal.regularPrice && (
@@ -126,7 +126,7 @@ export function DealCard({ deal, onClick, onAddToList, isAdded = false }: DealCa
               size="sm"
               variant="outline"
               disabled
-              className="shrink-0 bg-green-50 border-green-200 text-green-600"
+              className="shrink-0 bg-primary-50 border-primary-200 text-primary-600"
             >
               <Check className="w-4 h-4" />
             </Button>
@@ -138,7 +138,7 @@ export function DealCard({ deal, onClick, onAddToList, isAdded = false }: DealCa
                 e.stopPropagation();
                 onAddToList();
               }}
-              className="shrink-0 hover:bg-green-50 hover:border-green-200 hover:text-green-600"
+              className="shrink-0 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-600"
             >
               <ShoppingCart className="w-4 h-4" />
             </Button>

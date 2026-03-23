@@ -167,7 +167,7 @@ export default function SearchPage() {
         {/* Success Alert */}
         {addSuccess && (
           <div className="mb-6">
-            <Alert className="border-green-200 bg-green-50 text-green-800">
+            <Alert className="border-primary-200 bg-primary-50 text-primary-800">
               <AlertDescription>Product added to your list!</AlertDescription>
             </Alert>
           </div>
@@ -178,7 +178,7 @@ export default function SearchPage() {
           <div className="mb-6">
             <Alert>
               <AlertDescription>
-                <Link href="/login" className="text-green-600 hover:text-green-700 font-medium hover:underline">
+                <Link href="/login" className="text-primary-600 hover:text-primary-700 font-medium hover:underline">
                   Sign in
                 </Link>{" "}
                 to add products to your grocery list
@@ -214,8 +214,9 @@ export default function SearchPage() {
                 className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
               >
                 <option value="all">All Stores</option>
-                <option value="target">Target</option>
-                <option value="shoprite">ShopRite</option>
+                <option value="kroger">Kroger</option>
+                <option value="publix">Publix</option>
+                <option value="food-depot">Food Depot</option>
               </select>
             </div>
 
@@ -250,10 +251,10 @@ export default function SearchPage() {
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
                 <div>
                   <p className="font-medium text-blue-900">
-                    Searching Target and ShopRite...
+                    Searching stores near you...
                   </p>
                   <p className="text-sm text-blue-700">
-                    This may take 5-10 seconds as we scrape live prices
+                    This may take a moment while we search current deals
                   </p>
                 </div>
               </div>
@@ -400,7 +401,7 @@ export default function SearchPage() {
                   <CardFooter className="p-4 pt-0">
                     {isAuthenticated ? (
                       <Button
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        className="w-full bg-primary-500 hover:bg-primary-600"
                         onClick={() => handleAddToList(product.upc)}
                         disabled={addingToList}
                       >
@@ -466,7 +467,7 @@ export default function SearchPage() {
                     variant={currentPage === page ? "default" : "outline"}
                     size="sm"
                     onClick={() => setCurrentPage(page)}
-                    className={currentPage === page ? "bg-green-600 hover:bg-green-700" : ""}
+                    className={currentPage === page ? "bg-primary-500 hover:bg-primary-600" : ""}
                   >
                     {page}
                   </Button>

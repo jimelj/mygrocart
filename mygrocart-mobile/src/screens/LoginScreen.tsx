@@ -105,7 +105,7 @@ export default function LoginScreen({ navigation }: any) {
         >
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="cart" size={64} color="#16A34A" />
+              <Ionicons name="cart" size={64} color="#367723" />
             </View>
             <Text style={styles.title}>MyGroCart</Text>
             <Text style={styles.subtitle}>Welcome Back!</Text>
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#16A34A',
+    color: '#367723',
     marginBottom: 8,
   },
   subtitle: {
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   loginButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     height: 48,
     borderRadius: 8,
     alignItems: 'center',
@@ -297,6 +297,6 @@ const styles = StyleSheet.create({
   signupLink: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#16A34A',
+    color: '#367723',
   },
 });

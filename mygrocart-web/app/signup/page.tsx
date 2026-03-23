@@ -96,8 +96,8 @@ export default function SignupPage() {
               className="h-12 w-12"
             />
             <span className="text-3xl font-bold">
-              <span style={{ color: '#2d7a4c' }}>MyGro</span>
-              <span style={{ color: '#e67e3c' }}>Cart</span>
+              <span style={{ color: '#367723' }}>MyGro</span>
+              <span style={{ color: '#F06015' }}>Cart</span>
             </span>
           </Link>
         </div>
@@ -209,7 +209,7 @@ export default function SignupPage() {
               {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                className="w-full h-12 bg-primary-500 hover:bg-primary-600 text-white font-semibold"
                 disabled={isLoading || authLoading}
               >
                 {isLoading ? (
@@ -228,7 +228,7 @@ export default function SignupPage() {
               Already have an account?{" "}
               <Link
                 href="/login"
-                className="text-green-600 hover:text-green-700 font-medium hover:underline"
+                className="text-primary-600 hover:text-primary-700 font-medium hover:underline"
               >
                 Sign in
               </Link>

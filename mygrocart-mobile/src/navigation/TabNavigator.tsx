@@ -6,9 +6,7 @@ import { Image, View } from 'react-native';
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
 import ProductSearchScreen from '../screens/ProductSearchScreen';
-import BarcodeScannerScreen from '../screens/BarcodeScannerScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import MyRequestsScreen from '../screens/MyRequestsScreen';
 
 // Import navigators
 import ListStackNavigator from './ListStackNavigator';
@@ -23,15 +21,11 @@ export default function TabNavigator() {
           let iconName: keyof typeof Ionicons.glyphMap;
 
           if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
+            iconName = focused ? 'newspaper' : 'newspaper-outline';
           } else if (route.name === 'Search') {
             iconName = focused ? 'search' : 'search-outline';
-          } else if (route.name === 'Scanner') {
-            iconName = focused ? 'barcode' : 'barcode-outline';
           } else if (route.name === 'ListTab') {
             iconName = focused ? 'list' : 'list-outline';
-          } else if (route.name === 'Requests') {
-            iconName = focused ? 'document-text' : 'document-text-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else {
@@ -40,7 +34,7 @@ export default function TabNavigator() {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2d7a4c',
+        tabBarActiveTintColor: '#367723',
         tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
@@ -64,7 +58,7 @@ export default function TabNavigator() {
           fontWeight: '700',
           color: '#111827',
         },
-        headerTintColor: '#2d7a4c',
+        headerTintColor: '#367723',
       })}
     >
       <Tab.Screen
@@ -91,26 +85,11 @@ export default function TabNavigator() {
         }}
       />
       <Tab.Screen
-        name="Scanner"
-        component={BarcodeScannerScreen}
-        options={{
-          title: 'Scan',
-          headerShown: false,
-        }}
-      />
-      <Tab.Screen
         name="ListTab"
         component={ListStackNavigator}
         options={{
           title: 'My List',
           headerShown: false,
-        }}
-      />
-      <Tab.Screen
-        name="Requests"
-        component={MyRequestsScreen}
-        options={{
-          title: 'Requests',
         }}
       />
       <Tab.Screen

@@ -166,7 +166,7 @@ export default function ListScreen({ navigation }: any) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#367723" />
         <Text style={styles.loadingText}>Loading your list...</Text>
       </View>
     );
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   addButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,

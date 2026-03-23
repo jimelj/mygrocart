@@ -23,7 +23,7 @@ export function DealBadge({ count, onClick, className }: DealBadgeProps) {
     <Badge
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 hover:bg-green-200 border-green-300 transition-colors",
+        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-800 hover:bg-primary-200 border-primary-300 transition-colors",
         onClick && "cursor-pointer",
         className
       )}

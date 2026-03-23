@@ -108,7 +108,7 @@ class ScheduledScraping {
 
     const results = await this.orchestrator.runComprehensiveScraping({
       searchTerms,
-      zipCode: '07001',
+      zipCode: process.env.DEFAULT_PILOT_ZIP || '30132',
       maxResultsPerTerm: 20,
       includeDetailedScraping: false
     });
@@ -132,7 +132,7 @@ class ScheduledScraping {
 
     const results = await this.orchestrator.scrapeShopRite({
       searchTerms: quickSearchTerms,
-      zipCode: '07001',
+      zipCode: process.env.DEFAULT_PILOT_ZIP || '30132',
       maxResultsPerTerm: 10
     });
 
@@ -159,7 +159,7 @@ class ScheduledScraping {
 
     const results = await this.orchestrator.runComprehensiveScraping({
       searchTerms: weeklySearchTerms,
-      zipCode: '07001',
+      zipCode: process.env.DEFAULT_PILOT_ZIP || '30132',
       maxResultsPerTerm: 15,
       includeDetailedScraping: true
     });

@@ -2238,6 +2238,109 @@ const resolvers = {
           message: error.message
         };
       }
+    },
+
+    // ===================================================================
+    // UPLOAD FLYER MUTATION (Atlanta Pilot - Direct Scraper Integration)
+    // ===================================================================
+
+    /**
+     * uploadFlyer - Directly save a flyer with known image URLs.
+     *
+     * Used by direct store scrapers (KrogerFlyerScraper, PublixFlyerScraper,
+     * FoodDepotFlyerScraper) to inject flyers into the pipeline without
+     * going through the WeeklyAds2 API.
+     *
+     * The flyer is saved as PENDING status, then OCR processing is triggered
+     * asynchronously via the existing FlyerService.processFlyer() pipeline.
+     *
+     * Requires admin authentication.
+     */
+    uploadFlyer: async (_, { storeName, zipCode, imageUrls, validFrom, validTo, flyerName }, { user }) => {
+      try {
+        requireAdmin(user);
+
+        // Validate inputs
+        if (!storeName || !storeName.trim()) {
+          throw new Error('storeName is required');
+        }
+        if (!zipCode || !/^\d{5}$/.test(zipCode.trim())) {
+          throw new Error('zipCode must be a valid 5-digit ZIP code');
+        }
+        if (!imageUrls || imageUrls.length === 0) {
+          throw new Error('imageUrls must be a non-empty array');
+        }
+        if (!validFrom || !validTo) {
+          throw new Error('validFrom and validTo are required');
+        }
+
+        const cleanStoreName = storeName.trim();
+        const cleanZipCode = zipCode.trim();
+
+        // Build the storeSlug from the store name
+        const storeSlug = cleanStoreName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+        // Build a synthetic flyerRunId (deterministic, based on store+zip+date)
+        // This prevents duplicate flyers if uploadFlyer is called multiple times
+        const flyerRunId = parseInt(
+          Buffer.from(`${storeSlug}-${cleanZipCode}-${validFrom}`)
+            .toString('hex')
+            .substring(0, 8),
+          16
+        );
+
+        console.log(`[uploadFlyer] Creating flyer for ${cleanStoreName} ZIP ${cleanZipCode} (flyerRunId: ${flyerRunId})`);
+
+        // Build flyerData compatible with FlyerService.saveFlyer()
+        const flyerData = {
+          merchant: cleanStoreName,
+          merchant_slug: storeSlug,
+          flyer_run_id: flyerRunId,
+          name: flyerName || `${cleanStoreName} Weekly Ad`,
+          postal_code: cleanZipCode,
+          // Convert YYYY-MM-DD strings to Unix timestamps for saveFlyer compatibility
+          valid_from: Math.floor(new Date(validFrom).getTime() / 1000),
+          valid_to: Math.floor(new Date(validTo).getTime() / 1000),
+          imageUrls,
+          source: 'direct_upload'
+        };
+
+        // Save flyer record to database (no deals yet - OCR runs separately)
+        const savedFlyer = await flyerService.saveFlyer(flyerData, []);
+
+        if (!savedFlyer) {
+          throw new Error('Failed to save flyer - possibly a duplicate (same flyerRunId already exists)');
+        }
+
+        console.log(`[uploadFlyer] Saved flyer ${savedFlyer.id} for ${cleanStoreName} (ZIP ${cleanZipCode})`);
+
+        // Trigger OCR processing asynchronously (non-blocking)
+        // This queues the flyer for deal extraction via GPT-4o Mini
+        setImmediate(async () => {
+          try {
+            console.log(`[uploadFlyer] Triggering async OCR for flyer ${savedFlyer.id}...`);
+            await flyerService.processFlyer(savedFlyer.id);
+            console.log(`[uploadFlyer] OCR complete for flyer ${savedFlyer.id}`);
+          } catch (ocrError) {
+            console.error(`[uploadFlyer] OCR failed for flyer ${savedFlyer.id}:`, ocrError.message);
+            // Non-fatal: flyer remains in PENDING status and can be reprocessed later
+          }
+        });
+
+        // Return the saved flyer in GraphQL Flyer format
+        const plain = savedFlyer.get ? savedFlyer.get({ plain: true }) : savedFlyer;
+        return {
+          ...plain,
+          deals: [],
+          dealCount: 0
+        };
+      } catch (error) {
+        console.error('[uploadFlyer] Error:', error.message, error.stack);
+        throw new Error(`Failed to upload flyer: ${error.message}`);
+      }
     }
   },
 

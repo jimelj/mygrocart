@@ -33,7 +33,7 @@ router.post('/shoprite/search', async (req, res) => {
   try {
     const {
       searchTerms = ['milk', 'bread', 'eggs'],
-      zipCode = '07001',
+      zipCode = process.env.DEFAULT_PILOT_ZIP || '30132',
       maxResultsPerTerm = 10
     } = req.body;
 
@@ -87,7 +87,7 @@ router.post('/shoprite/comprehensive', async (req, res) => {
   try {
     const {
       searchTerms,
-      zipCode = '07001',
+      zipCode = process.env.DEFAULT_PILOT_ZIP || '30132',
       maxResultsPerTerm = 15,
       includeDetailedScraping = false
     } = req.body;

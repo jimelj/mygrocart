@@ -6,11 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "light",
-    "primaryColor": "#2d7a4c",
+    "primaryColor": "#367723",
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2d7a4c"
+      "backgroundColor": "#367723"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -22,13 +22,9 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#2d7a4c"
+        "backgroundColor": "#367723"
       },
       "package": "com.mygrocart.app",
-      "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
-      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },

@@ -237,7 +237,7 @@ export default function ProductSearchScreen({ navigation }: any) {
           style={styles.addButton}
           onPress={() => handleAddToList(item)}
         >
-          <Ionicons name="add-circle" size={28} color="#16A34A" />
+          <Ionicons name="add-circle" size={28} color="#367723" />
         </TouchableOpacity>
       </View>
     );
@@ -322,7 +322,7 @@ export default function ProductSearchScreen({ navigation }: any) {
 
       {loading && products.length === 0 && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#16A34A" />
+          <ActivityIndicator size="large" color="#367723" />
           <Text style={styles.loadingText}>Searching stores...</Text>
           <Text style={styles.loadingSubtext}>
             This may take 5-10 seconds while we check Target and ShopRite
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#16A34A',
+    color: '#367723',
   },
   dealBadge: {
     backgroundColor: '#DC2626',

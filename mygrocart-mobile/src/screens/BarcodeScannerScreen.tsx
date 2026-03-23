@@ -115,7 +115,7 @@ export default function BarcodeScannerScreen({ navigation }: any) {
   if (hasPermission === null) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#367723" />
         <Text style={styles.text}>Requesting camera permission...</Text>
       </View>
     );
@@ -168,12 +168,12 @@ export default function BarcodeScannerScreen({ navigation }: any) {
         <View style={styles.resultContainer}>
           {isLoading ? (
             <>
-              <ActivityIndicator size="large" color="#16A34A" />
+              <ActivityIndicator size="large" color="#367723" />
               <Text style={styles.text}>Fetching product information...</Text>
             </>
           ) : product ? (
             <>
-              <Ionicons name="checkmark-circle" size={64} color="#16A34A" />
+              <Ionicons name="checkmark-circle" size={64} color="#367723" />
               <Text style={styles.title}>Product Found!</Text>
 
               <View style={styles.productInfo}>
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderColor: '#16A34A',
+    borderColor: '#367723',
   },
   cornerTopRight: {
     position: 'absolute',
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderColor: '#16A34A',
+    borderColor: '#367723',
   },
   cornerBottomLeft: {
     position: 'absolute',
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderColor: '#16A34A',
+    borderColor: '#367723',
   },
   cornerBottomRight: {
     position: 'absolute',
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderColor: '#16A34A',
+    borderColor: '#367723',
   },
   resultContainer: {
     flex: 1,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   button: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,

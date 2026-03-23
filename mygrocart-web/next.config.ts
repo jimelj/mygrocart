@@ -8,19 +8,23 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'images.cdn.shoprite.com',
+        hostname: 'www.kroger.com',
       },
       {
         protocol: 'https',
-        hostname: 'assets.wakefern.com',
+        hostname: 'www.publix.com',
       },
       {
         protocol: 'https',
-        hostname: 'target.scene7.com',
+        hostname: 'weeklyad.publix.com',
       },
       {
         protocol: 'https',
-        hostname: 'example.com',
+        hostname: 'www.fooddepot.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dam.flippenterprise.net',
       },
       {
         protocol: 'https',

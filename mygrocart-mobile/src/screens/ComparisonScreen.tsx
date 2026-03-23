@@ -77,7 +77,7 @@ export default function ComparisonScreen({ navigation }: any) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#367723" />
         <Text style={styles.loadingText}>Comparing prices...</Text>
       </View>
     );
@@ -187,7 +187,7 @@ export default function ComparisonScreen({ navigation }: any) {
 
               {comparison.savings > 0 ? (
                 <View style={styles.savingsContainer}>
-                  <Ionicons name="trending-down" size={16} color="#16A34A" />
+                  <Ionicons name="trending-down" size={16} color="#367723" />
                   <Text style={styles.savingsText}>
                     Save ${comparison.savings.toFixed(2)}
                   </Text>
@@ -201,7 +201,7 @@ export default function ComparisonScreen({ navigation }: any) {
                 onPress={() => openStoreDetails(comparison)}
               >
                 <Text style={styles.viewDetailsButtonText}>View Breakdown</Text>
-                <Ionicons name="chevron-forward" size={18} color="#16A34A" />
+                <Ionicons name="chevron-forward" size={18} color="#367723" />
               </TouchableOpacity>
             </View>
           ))}
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
   },
   cheapestCard: {
     borderWidth: 2,
-    borderColor: '#16A34A',
+    borderColor: '#367723',
     backgroundColor: 'rgba(22, 163, 74, 0.02)',
   },
   storeHeader: {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   cheapestBadge: {
     flexDirection: 'row',
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
   },
   savingsText: {
     fontSize: 14,
-    color: '#16A34A',
+    color: '#367723',
     marginLeft: 6,
     fontWeight: '600',
   },
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   viewDetailsButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#16A34A',
+    color: '#367723',
     marginRight: 6,
   },
   // Modal Styles
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   breakdownItemTotal: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#16A34A',
+    color: '#367723',
     fontFamily: 'monospace',
   },
   breakdownItemUnavailable: {
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   summaryValueGreen: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#16A34A',
+    color: '#367723',
     fontFamily: 'monospace',
   },
   // Modal Footer
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   modalCloseButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#367723',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 8,

@@ -30,7 +30,7 @@ export function PriceFreshnessBadge({
 
   const styles = {
     fresh: {
-      container: 'bg-green-100 border-green-200 text-green-700',
+      container: 'bg-primary-100 border-primary-200 text-primary-700',
       icon: Check
     },
     recent: {

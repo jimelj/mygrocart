@@ -261,7 +261,7 @@ export default function AdminDashboard() {
         icon: <Loader2 className="h-3 w-3 mr-1 animate-spin" />,
       },
       completed: {
-        className: "bg-green-100 text-green-700",
+        className: "bg-primary-100 text-primary-700",
         icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
       },
       failed: {
@@ -284,7 +284,7 @@ export default function AdminDashboard() {
     const variants: Record<string, string> = {
       pending: "bg-gray-100 text-gray-700",
       processing: "bg-blue-100 text-blue-700",
-      completed: "bg-green-100 text-green-700",
+      completed: "bg-primary-100 text-primary-700",
       failed: "bg-red-100 text-red-700",
     };
 
@@ -347,7 +347,7 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 mx-auto animate-spin text-green-600" />
+          <Loader2 className="h-12 w-12 mx-auto animate-spin text-primary-600" />
           <p className="mt-4 text-gray-500">Loading...</p>
         </div>
       </div>
@@ -372,7 +372,7 @@ export default function AdminDashboard() {
               </AlertDescription>
             </Alert>
             <div className="mt-6">
-              <Button asChild className="bg-green-600 hover:bg-green-700">
+              <Button asChild className="bg-primary-500 hover:bg-primary-600">
                 <Link href="/login?returnUrl=/admin">Sign In</Link>
               </Button>
             </div>
@@ -400,7 +400,7 @@ export default function AdminDashboard() {
               </AlertDescription>
             </Alert>
             <div className="mt-6">
-              <Button asChild className="bg-green-600 hover:bg-green-700">
+              <Button asChild className="bg-primary-500 hover:bg-primary-600">
                 <Link href="/">Go Home</Link>
               </Button>
             </div>
@@ -417,7 +417,7 @@ export default function AdminDashboard() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="flex items-center gap-2 text-3xl font-bold text-gray-900">
-              <LayoutDashboard className="h-8 w-8 text-green-600" />
+              <LayoutDashboard className="h-8 w-8 text-primary-600" />
               Admin Dashboard
             </h1>
             <p className="mt-2 text-gray-500">
@@ -476,7 +476,7 @@ export default function AdminDashboard() {
                 <Skeleton className="h-8 w-16" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold text-green-600">
+                  <div className="text-2xl font-bold text-primary-600">
                     {stats?.totalDeals || 0}
                   </div>
                   <p className="text-xs text-gray-500">Deals extracted</p>
@@ -534,7 +534,7 @@ export default function AdminDashboard() {
                 <Input
                   id="zipCode"
                   type="text"
-                  placeholder="08857"
+                  placeholder="30132"
                   value={zipCode}
                   onChange={handleZipCodeChange}
                   maxLength={5}
@@ -548,7 +548,7 @@ export default function AdminDashboard() {
               <Button
                 onClick={handleFetchFlyers}
                 disabled={fetchingFlyers || fetchStatus.state === "loading" || !zipCode || !!zipError}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-primary-500 hover:bg-primary-600"
               >
                 {fetchingFlyers || fetchStatus.state === "loading" ? (
                   <>
@@ -573,9 +573,9 @@ export default function AdminDashboard() {
                   </Alert>
                 )}
                 {fetchStatus.state === "success" && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="ml-2 text-green-700">
+                  <Alert className="border-primary-200 bg-primary-50">
+                    <CheckCircle2 className="h-4 w-4 text-primary-600" />
+                    <AlertDescription className="ml-2 text-primary-700">
                       {fetchStatus.message}
                     </AlertDescription>
                   </Alert>
@@ -609,7 +609,7 @@ export default function AdminDashboard() {
                     onChange={(e) =>
                       setJobStatusFilter(e.target.value === "all" ? undefined : e.target.value)
                     }
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-green-600 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
                   >
                     <option value="all">All</option>
                     <option value="queued">Queued</option>
@@ -624,7 +624,7 @@ export default function AdminDashboard() {
                     id="auto-refresh-jobs"
                     checked={autoRefresh}
                     onChange={(e) => setAutoRefresh(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-600"
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-2 focus:ring-primary-600"
                   />
                   <label htmlFor="auto-refresh-jobs" className="text-sm text-gray-700">
                     Auto-refresh
@@ -724,7 +724,7 @@ export default function AdminDashboard() {
                   onChange={(e) =>
                     setFlyerZipFilter(e.target.value === "all" ? undefined : e.target.value)
                   }
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-green-600 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2"
                 >
                   <option value="all">All ZIP Codes</option>
                   {uniqueZipCodes.map((zip) => (
@@ -789,7 +789,7 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell>{getFlyerStatusBadge(flyer.status)}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <Badge variant="outline" className="bg-primary-50 text-primary-700 border-primary-200">
                             {flyer.dealCount} deals
                           </Badge>
                         </TableCell>
@@ -831,7 +831,7 @@ export default function AdminDashboard() {
                         </div>
                         <div className="h-6 w-full overflow-hidden rounded-full bg-gray-100">
                           <div
-                            className="h-full bg-green-600 transition-all duration-500"
+                            className="h-full bg-primary-500 transition-all duration-500"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>

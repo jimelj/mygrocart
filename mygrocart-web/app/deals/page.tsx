@@ -63,11 +63,9 @@ const CATEGORIES = [
 
 const STORES = [
   'All Stores',
-  'ShopRite',
-  'Target',
-  'ACME',
-  'Stop & Shop',
-  'Walmart',
+  'Kroger',
+  'Publix',
+  'Food Depot',
 ];
 
 export default function DealsPage() {
@@ -80,7 +78,7 @@ export default function DealsPage() {
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const zipCode = user?.zipCode || '07001';
+  const zipCode = user?.zipCode || '30132';
 
   // GraphQL query - must be before any conditional returns
   const { data, loading, error } = useQuery<GetDealsNearMeResponse>(GET_DEALS_NEAR_ME, {
@@ -126,7 +124,7 @@ export default function DealsPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -180,9 +178,9 @@ export default function DealsPage() {
 
         {/* Success message */}
         {showSuccess && (
-          <Alert className="mb-6 bg-green-50 border-green-200">
-            <CheckCircle className="w-4 h-4 text-green-600" />
-            <AlertDescription className="text-green-800">
+          <Alert className="mb-6 bg-primary-50 border-primary-200">
+            <CheckCircle className="w-4 h-4 text-primary-600" />
+            <AlertDescription className="text-primary-800">
               Item added to your shopping list!
             </AlertDescription>
           </Alert>
@@ -304,9 +302,9 @@ export default function DealsPage() {
             ) : (
               <>
                 <div className="w-16 h-16 mx-auto mb-4 relative">
-                  <Tag className="w-16 h-16 text-green-200" />
+                  <Tag className="w-16 h-16 text-primary-200" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-green-500 border-t-transparent"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -323,7 +321,7 @@ export default function DealsPage() {
                 </p>
                 <Button
                   onClick={() => window.location.reload()}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-primary-500 hover:bg-primary-600"
                 >
                   Refresh Page
                 </Button>

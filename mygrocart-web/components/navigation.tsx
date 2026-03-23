@@ -34,8 +34,8 @@ export function Navigation() {
   // Navigation items - only shown when logged in (logo links to home)
   const navItems = isAuthenticated
     ? [
-        { name: "Deals", href: "/deals", icon: Tag },
         { name: "Flyers", href: "/flyers", icon: Newspaper },
+        { name: "Deals", href: "/deals", icon: Tag },
         { name: "My List", href: "/list", icon: ShoppingCart },
         { name: "Compare", href: "/comparison", icon: DollarSign },
       ]
@@ -66,8 +66,8 @@ export function Navigation() {
               priority
             />
             <span className="text-xl font-bold">
-              <span style={{ color: '#2d7a4c' }}>MyGro</span>
-              <span style={{ color: '#e67e3c' }}>Cart</span>
+              <span style={{ color: '#367723' }}>MyGro</span>
+              <span style={{ color: '#F06015' }}>Cart</span>
             </span>
           </Link>
 
@@ -83,11 +83,11 @@ export function Navigation() {
                   href={item.href}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-green-50 text-green-700"
+                      ? "bg-primary-50 text-primary-700"
                       : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                   }`}
                 >
-                  <Icon className={`h-4 w-4 ${isActive ? "text-green-600" : ""}`} />
+                  <Icon className={`h-4 w-4 ${isActive ? "text-primary-600" : ""}`} />
                   {item.name}
                 </Link>
               );
@@ -143,7 +143,7 @@ export function Navigation() {
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/login">Sign In</Link>
                 </Button>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" asChild>
+                <Button size="sm" className="bg-primary-500 hover:bg-primary-600 text-white" asChild>
                   <Link href="/signup">Sign Up</Link>
                 </Button>
               </div>
@@ -177,12 +177,12 @@ export function Navigation() {
                     href={item.href}
                     className={`flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-colors ${
                       isActive
-                        ? "bg-green-50 text-green-700"
+                        ? "bg-primary-50 text-primary-700"
                         : "text-gray-700 hover:bg-gray-100"
                     }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <Icon className={`h-5 w-5 ${isActive ? "text-green-600" : "text-gray-500"}`} />
+                    <Icon className={`h-5 w-5 ${isActive ? "text-primary-600" : "text-gray-500"}`} />
                     {item.name}
                   </Link>
                 );
@@ -238,7 +238,7 @@ export function Navigation() {
                     <Button variant="outline" className="w-full" asChild>
                       <Link href="/login">Sign In</Link>
                     </Button>
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white" asChild>
+                    <Button className="w-full bg-primary-500 hover:bg-primary-600 text-white" asChild>
                       <Link href="/signup">Sign Up</Link>
                     </Button>
                   </div>

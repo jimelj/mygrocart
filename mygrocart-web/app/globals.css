@@ -1,42 +1,30 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Brand Colors - Updated to match MyGroCart logo */
-  /* Primary Green (from cart outline and "MyGro" text) */
-  --color-primary-50: #f0f9f4;
-  --color-primary-100: #dcf2e4;
-  --color-primary-200: #bce5cd;
-  --color-primary-300: #8cd2ad;
-  --color-primary-400: #59b886;
-  --color-primary-500: #2d7a4c;
-  --color-primary-600: #246341;
-  --color-primary-700: #1d4f35;
-  --color-primary-800: #183f2c;
-  --color-primary-900: #143426;
+  /* Brand Colors */
+  /* Primary Green */
+  --color-primary-50: #f0f7ed;
+  --color-primary-100: #ddefd5;
+  --color-primary-200: #bde0ad;
+  --color-primary-300: #93cb7b;
+  --color-primary-400: #6db452;
+  --color-primary-500: #367723;
+  --color-primary-600: #2d631d;
+  --color-primary-700: #244f18;
+  --color-primary-800: #1d3f14;
+  --color-primary-900: #173311;
 
-  /* Secondary Orange (from cart wheels and "Cart" text) */
-  --color-secondary-50: #fef6ee;
-  --color-secondary-100: #fdead7;
-  --color-secondary-200: #fad2ae;
-  --color-secondary-300: #f7b47b;
-  --color-secondary-400: #f38c46;
-  --color-secondary-500: #e67e3c;
-  --color-secondary-600: #d7621f;
-  --color-secondary-700: #b34918;
-  --color-secondary-800: #8f3b1a;
-  --color-secondary-900: #743318;
-
-  /* Accent Yellow (from cart gradient fill) */
-  --color-accent-50: #fefbe8;
-  --color-accent-100: #fef7c3;
-  --color-accent-200: #feeb8a;
-  --color-accent-300: #fddb47;
-  --color-accent-400: #fac515;
-  --color-accent-500: #f5a623;
-  --color-accent-600: #d27f06;
-  --color-accent-700: #a85a09;
-  --color-accent-800: #8b460f;
-  --color-accent-900: #753913;
+  /* Secondary Orange */
+  --color-secondary-50: #fef3ec;
+  --color-secondary-100: #fde3d0;
+  --color-secondary-200: #fbc5a1;
+  --color-secondary-300: #f9a068;
+  --color-secondary-400: #f57d35;
+  --color-secondary-500: #F06015;
+  --color-secondary-600: #d14d0e;
+  --color-secondary-700: #ae3d0b;
+  --color-secondary-800: #8c3210;
+  --color-secondary-900: #742b10;
 
   /* Neutral Colors */
   --color-gray-50: #f9fafb;
@@ -51,8 +39,8 @@
   --color-gray-900: #111827;
 
   /* Status Colors */
-  --color-success: #2d7a4c;
-  --color-warning: #f5a623;
+  --color-success: #367723;
+  --color-warning: #F06015;
   --color-error: #dc2626;
   --color-info: #3b82f6;
 
@@ -62,7 +50,7 @@
 
   /* Background & Foreground */
   --color-background: #ffffff;
-  --color-foreground: #111827;
+  --color-foreground: #131313;
 }
 
 body {
