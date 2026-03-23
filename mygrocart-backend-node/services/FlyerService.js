@@ -1293,35 +1293,61 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
 
       console.log(`[FlyerService] Processing scraper flyer: ${scraperFlyer.storeName} (${flyerRunId})`);
 
-      // Download images from store CDN URLs — filter out any that 404
-      const validImageUrls = [];
-      for (const url of scraperFlyer.imageUrls) {
-        try {
-          const response = await axios.head(url, { timeout: 5000 });
-          if (response.status === 200) {
-            validImageUrls.push(url);
+      // Check if scraper provided pre-extracted deals (e.g., Lidl API, ALDI Flipp)
+      // If so, skip image validation and OCR entirely
+      const hasPreExtractedDeals = scraperFlyer.preExtractedDeals && scraperFlyer.preExtractedDeals.length > 0;
+
+      let cloudinaryUrls = [];
+      let enrichedDeals = [];
+
+      if (hasPreExtractedDeals) {
+        console.log(`[FlyerService] ${scraperFlyer.storeName} provided ${scraperFlyer.preExtractedDeals.length} pre-extracted deals — skipping OCR`);
+        enrichedDeals = scraperFlyer.preExtractedDeals;
+
+        // Still try to validate and upload images if provided (for the flyer viewer)
+        if (scraperFlyer.imageUrls && scraperFlyer.imageUrls.length > 0) {
+          const validImageUrls = [];
+          for (const url of scraperFlyer.imageUrls.slice(0, 10)) { // Cap at 10 for speed
+            try {
+              const response = await axios.head(url, { timeout: 5000 });
+              if (response.status === 200) {
+                validImageUrls.push(url);
+              }
+            } catch {
+              // skip
+            }
+            await this.delay(200);
           }
-        } catch {
-          // Image doesn't exist at this URL - skip it
+          if (validImageUrls.length > 0) {
+            cloudinaryUrls = await this.uploadToCloudinary(validImageUrls, flyerRunId);
+          }
         }
-        await this.delay(300); // Small delay between HEAD requests
+      } else {
+        // No pre-extracted deals — validate images, upload, and OCR
+        const validImageUrls = [];
+        for (const url of scraperFlyer.imageUrls) {
+          try {
+            const response = await axios.head(url, { timeout: 5000 });
+            if (response.status === 200) {
+              validImageUrls.push(url);
+            }
+          } catch {
+            // Image doesn't exist at this URL - skip it
+          }
+          await this.delay(300);
+        }
+
+        if (validImageUrls.length === 0) {
+          console.warn(`[FlyerService] No valid images found for ${scraperFlyer.storeName} flyer`);
+          return { success: false, dealsCount: 0, error: 'No valid images found' };
+        }
+
+        console.log(`[FlyerService] Found ${validImageUrls.length}/${scraperFlyer.imageUrls.length} valid image URLs for ${scraperFlyer.storeName}`);
+
+        cloudinaryUrls = await this.uploadToCloudinary(validImageUrls, flyerRunId);
+        const deals = await this.extractDealsWithOCR(cloudinaryUrls);
+        enrichedDeals = await this.enrichDealsWithImages(deals);
       }
-
-      if (validImageUrls.length === 0) {
-        console.warn(`[FlyerService] No valid images found for ${scraperFlyer.storeName} flyer`);
-        return { success: false, dealsCount: 0, error: 'No valid images found' };
-      }
-
-      console.log(`[FlyerService] Found ${validImageUrls.length}/${scraperFlyer.imageUrls.length} valid image URLs for ${scraperFlyer.storeName}`);
-
-      // Upload to Cloudinary
-      const cloudinaryUrls = await this.uploadToCloudinary(validImageUrls, flyerRunId);
-
-      // Extract deals with OCR
-      const deals = await this.extractDealsWithOCR(cloudinaryUrls);
-
-      // Enrich deals with product images
-      const enrichedDeals = await this.enrichDealsWithImages(deals);
 
       // Save to database using the standard saveFlyer method
       // Convert scraper format to the format saveFlyer expects

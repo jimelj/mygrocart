@@ -16,8 +16,6 @@ const FoodDepotFlyerScraper = require('./FoodDepotFlyerScraper');
 const LidlFlyerScraper = require('./LidlFlyerScraper');
 const AldiFlyerScraper = require('./AldiFlyerScraper');
 const FoodLionFlyerScraper = require('./FoodLionFlyerScraper');
-const WegmansFlyerScraper = require('./WegmansFlyerScraper');
-
 /**
  * ScraperRegistry maps store slugs to their scraper classes.
  * Use this to instantiate scrapers by store name dynamically.
@@ -33,8 +31,7 @@ const ScraperRegistry = {
   'food-depot': FoodDepotFlyerScraper,
   lidl: LidlFlyerScraper,
   aldi: AldiFlyerScraper,
-  'food-lion': FoodLionFlyerScraper,
-  wegmans: WegmansFlyerScraper
+  'food-lion': FoodLionFlyerScraper
 };
 
 /**
@@ -93,7 +90,6 @@ module.exports = {
   LidlFlyerScraper,
   AldiFlyerScraper,
   FoodLionFlyerScraper,
-  WegmansFlyerScraper,
   ScraperRegistry,
   getScraperForStore,
   fetchAllStoreFlyers
