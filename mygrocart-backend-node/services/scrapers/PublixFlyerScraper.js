@@ -1,214 +1,191 @@
 /**
  * PublixFlyerScraper
  *
- * Fetches Publix weekly ad flyer pages for stores near a given ZIP code.
- * Returns flyer objects compatible with FlyerService.saveFlyer() format.
+ * Fetches Publix weekly ad data using the public Flipp API.
+ * Same pattern as Kroger — no auth required.
  *
- * Publix publishes their weekly ad at weeklyad.publix.com and as a
- * web-viewable PDF with enumerable page images.
+ * API Flow:
+ * 1. GET backflipp.wishabi.com/flipp/flyers?postal_code=30132 → discover flyer ID
+ * 2. GET dam.flippenterprise.net/api/flipp/flyers/{id}/flyer_items → all deals
  */
 
 const axios = require('axios');
 
-// Known Publix store locations near Dallas, GA (ZIP 30132)
-const PUBLIX_STORES_NEAR_30132 = [
-  {
-    storeId: 'publix-dallas-ga-01',
-    name: 'Publix Super Market',
-    address: '90 Merchants Dr',
-    city: 'Dallas',
-    state: 'GA',
-    zipCode: '30132',
-    latitude: 33.9205,
-    longitude: -84.8450,
-    publixStoreNum: '1274' // Approximate Publix store number
-  },
-  {
-    storeId: 'publix-acworth-ga-01',
-    name: 'Publix Super Market',
-    address: '3100 Hwy 92',
-    city: 'Acworth',
-    state: 'GA',
-    zipCode: '30102',
-    latitude: 34.0489,
-    longitude: -84.6897,
-    publixStoreNum: '1059'
-  }
-];
-
 class PublixFlyerScraper {
-  /**
-   * @param {object} options
-   * @param {number} options.rateLimitMs - Minimum ms between requests (default 1500)
-   */
   constructor(options = {}) {
     this.rateLimitMs = options.rateLimitMs || 1500;
 
     this.httpClient = axios.create({
-      timeout: 20000,
+      timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MyGroCart/1.0; +https://mygrocart.com)',
-        'Accept': 'application/json, text/html, */*',
-        'Referer': 'https://www.publix.com/'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'application/json'
       }
     });
-
-    // Publix weekly ad base
-    this.WEEKLY_AD_BASE = 'https://weeklyad.publix.com';
-
-    // Publix weekly ad API endpoint (store-specific)
-    this.FLYER_API = 'https://weeklyad.publix.com/savings';
   }
 
-  /**
-   * Sleep for rateLimitMs milliseconds.
-   */
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms || this.rateLimitMs));
   }
 
-  /**
-   * Get Publix store locations near a ZIP code.
-   * Returns the hardcoded list for the Atlanta pilot (ZIP 30132).
-   *
-   * @param {string} zipCode
-   * @returns {Promise<Array>} Array of store location objects
-   */
   async getStoreLocations(zipCode) {
-    console.log(`[PublixFlyerScraper] Looking up Publix stores near ZIP ${zipCode}...`);
-
-    const stores = PUBLIX_STORES_NEAR_30132.filter(store => {
-      return store.zipCode === zipCode || store.state === 'GA';
-    });
-
-    if (stores.length > 0) {
-      console.log(`[PublixFlyerScraper] Found ${stores.length} Publix location(s) near ZIP ${zipCode}`);
-      return stores;
-    }
-
-    console.log(`[PublixFlyerScraper] No exact match, returning all Atlanta-area Publix stores`);
-    return PUBLIX_STORES_NEAR_30132;
+    return [{ zipCode }];
   }
 
   /**
-   * Attempt to fetch the Publix weekly ad metadata for a given store.
-   * Publix serves flyers via their weekly ad viewer with predictable URL patterns.
-   *
-   * @param {object} store - Store object from getStoreLocations()
-   * @param {string} zipCode - Target ZIP code
-   * @returns {Promise<object|null>} Flyer object or null if unavailable
+   * Discover the current Publix weekly ad flyer ID using Flipp's flyers API.
    */
-  async fetchFlyerForStore(store, zipCode) {
+  async discoverFlyerId(zipCode) {
     try {
-      console.log(
-        `[PublixFlyerScraper] Fetching weekly ad for Publix at ${store.address}, ${store.city}, ${store.state}...`
+      const response = await this.httpClient.get(
+        'https://backflipp.wishabi.com/flipp/flyers',
+        { params: { postal_code: zipCode, locale: 'en-us' } }
       );
 
-      await this.delay();
+      const flyers = response.data?.flyers || response.data || [];
 
-      // Calculate current Publix ad week (typically Wed-Tue)
-      const now = new Date();
-      const dayOfWeek = now.getDay(); // 0=Sun
-      // Publix weekly ads run Wednesday to Tuesday
-      // Find the most recent Wednesday
-      const daysToLastWed = (dayOfWeek + 4) % 7;
-      const validFrom = new Date(now);
-      validFrom.setDate(now.getDate() - daysToLastWed);
-      validFrom.setHours(0, 0, 0, 0);
-      const validTo = new Date(validFrom);
-      validTo.setDate(validFrom.getDate() + 6); // 7-day window
-      validTo.setHours(23, 59, 59, 999);
-
-      const validFromStr = validFrom.toISOString().split('T')[0];
-      const validToStr = validTo.toISOString().split('T')[0];
-
-      // Attempt to call the Publix weekly ad API to get actual flyer info
-      let flyerMeta = null;
-      try {
-        const apiResponse = await this.httpClient.get(`${this.FLYER_API}`, {
-          params: {
-            store_code: store.publixStoreNum
-          },
-          timeout: 10000
-        });
-        flyerMeta = apiResponse.data;
-      } catch (apiErr) {
-        // Expected to fail if endpoint changes; fall back to CDN pattern
-        console.warn(
-          `[PublixFlyerScraper] API call failed for store ${store.publixStoreNum}: ${apiErr.message}. Using CDN pattern.`
-        );
-      }
-
-      // Build Publix flyer page image URLs using their CDN pattern.
-      // Publix hosts flyer pages at:
-      // https://weeklyad.publix.com/content/publix/flyers/{flyerId}/page-{n}.jpg
-      // When the flyerId is unknown, we use the store number and date-based slug.
-      const dateSlug = validFromStr.replace(/-/g, '');
-      const pageCount = 14; // Typical Publix weekly ad page count
-      const imageUrls = [];
-
-      for (let page = 1; page <= pageCount; page++) {
-        // Primary CDN pattern
-        imageUrls.push(
-          `https://weeklyad.publix.com/content/publix/${store.publixStoreNum}/${dateSlug}/page-${page}.jpg`
-        );
-      }
-
-      // Fallback: Publix also hosts on their main CDN
-      // https://cdn.publix.com/content/dam/publix/weeklyad/{storeNum}/{date}/page{n}.jpg
-      if (imageUrls.length === 0) {
-        for (let page = 1; page <= pageCount; page++) {
-          imageUrls.push(
-            `https://cdn.publix.com/content/dam/publix/weeklyad/${store.publixStoreNum}/${dateSlug}/page${page}.jpg`
-          );
-        }
-      }
-
-      return {
-        storeName: 'Publix',
-        storeSlug: 'publix',
-        flyerName: 'Weekly Ad',
-        imageUrls,
-        validFrom: validFromStr,
-        validTo: validToStr,
-        zipCode,
-        source: 'direct_scrape',
-        storeAddress: store.address,
-        storeCity: store.city,
-        storeState: store.state,
-        storeLatitude: store.latitude,
-        storeLongitude: store.longitude,
-        publixStoreNum: store.publixStoreNum
-      };
-    } catch (error) {
-      console.error(
-        `[PublixFlyerScraper] Failed to fetch flyer for Publix at ${store.address}: ${error.message}`
+      // Find the Publix "Weekly Ad" flyer (not extra savings or Spanish)
+      const publixWeekly = flyers.find(f =>
+        (f.merchant || '').toLowerCase().includes('publix') &&
+        (f.name || '').toLowerCase().includes('weekly')
       );
+
+      if (publixWeekly) {
+        console.log(`[PublixFlyerScraper] Found Publix Weekly Ad ID: ${publixWeekly.id}, valid: ${publixWeekly.valid_from} to ${publixWeekly.valid_to}`);
+        return publixWeekly;
+      }
+
+      // Fall back to any Publix flyer
+      const anyPublix = flyers.find(f =>
+        (f.merchant || '').toLowerCase().includes('publix')
+      );
+
+      if (anyPublix) {
+        console.log(`[PublixFlyerScraper] Found Publix flyer: ${anyPublix.id} (${anyPublix.name})`);
+        return anyPublix;
+      }
+
+      console.log(`[PublixFlyerScraper] No Publix flyers found for ZIP ${zipCode}`);
+      return null;
+    } catch (err) {
+      console.error(`[PublixFlyerScraper] Flipp flyers API error: ${err.message}`);
       return null;
     }
   }
 
   /**
-   * Fetch all Publix flyers for stores near a ZIP code.
-   *
-   * @param {string} zipCode - 5-digit ZIP code
-   * @returns {Promise<Array>} Array of flyer objects compatible with FlyerService
+   * Fetch all deal items from a Publix flyer via Flipp API.
    */
+  async fetchFlyerItems(flyerId) {
+    try {
+      const response = await this.httpClient.get(
+        `https://dam.flippenterprise.net/api/flipp/flyers/${flyerId}/flyer_items`,
+        { params: { locale: 'en' } }
+      );
+
+      return response.data || [];
+    } catch (err) {
+      console.error(`[PublixFlyerScraper] Flyer items API error: ${err.message}`);
+      return [];
+    }
+  }
+
+  async fetchFlyerForStore(store, zipCode) {
+    try {
+      console.log(`[PublixFlyerScraper] Fetching Publix weekly ad via Flipp for ZIP ${zipCode}...`);
+
+      await this.delay();
+
+      // Step 1: Discover current flyer ID
+      const flyerMeta = await this.discoverFlyerId(zipCode);
+      if (!flyerMeta) return null;
+
+      await this.delay();
+
+      // Step 2: Fetch all deal items
+      const items = await this.fetchFlyerItems(flyerMeta.id);
+      console.log(`[PublixFlyerScraper] Got ${items.length} items from Flipp`);
+
+      // Extract deals
+      const deals = [];
+      const imageUrls = [];
+
+      for (const item of items) {
+        if (item.display_type && item.display_type !== 1) continue;
+
+        let salePrice = null;
+        if (item.price) {
+          const priceMatch = String(item.price).match(/\$?([\d]+\.[\d]{2})/);
+          if (priceMatch) salePrice = parseFloat(priceMatch[1]);
+        }
+        if (!salePrice && item.pre_price_text) {
+          const match = String(item.pre_price_text).match(/\$?([\d]+\.[\d]{2})/);
+          if (match) salePrice = parseFloat(match[1]);
+        }
+        if (!salePrice && item.post_price_text) {
+          const match = String(item.post_price_text).match(/\$?([\d]+\.[\d]{2})/);
+          if (match) salePrice = parseFloat(match[1]);
+        }
+
+        const deal = {
+          productName: item.name || '',
+          productBrand: item.brand || null,
+          salePrice,
+          regularPrice: null,
+          unit: 'each',
+          dealType: 'sale',
+          productCategory: null
+        };
+
+        if (deal.productName && deal.salePrice) {
+          deals.push(deal);
+        }
+
+        if (item.cutout_image_url) {
+          imageUrls.push(item.cutout_image_url);
+        }
+      }
+
+      const thumbnailUrl = flyerMeta.premium_thumbnail_url || flyerMeta.thumbnail_url;
+      if (thumbnailUrl) {
+        imageUrls.unshift(thumbnailUrl);
+      }
+
+      const validFromStr = flyerMeta.valid_from
+        ? new Date(flyerMeta.valid_from).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      const validToStr = flyerMeta.valid_to
+        ? new Date(flyerMeta.valid_to).toISOString().split('T')[0]
+        : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+      console.log(`[PublixFlyerScraper] Extracted ${deals.length} deals for Publix`);
+
+      return {
+        storeName: 'Publix',
+        storeSlug: 'publix',
+        flyerName: flyerMeta.name || 'Weekly Ad',
+        imageUrls: imageUrls.slice(0, 20),
+        validFrom: validFromStr,
+        validTo: validToStr,
+        zipCode,
+        source: 'flipp_api',
+        preExtractedDeals: deals,
+        flippFlyerId: flyerMeta.id
+      };
+    } catch (error) {
+      console.error(`[PublixFlyerScraper] Failed to fetch Publix flyer: ${error.message}`);
+      return null;
+    }
+  }
+
   async fetchFlyers(zipCode) {
     console.log(`[PublixFlyerScraper] Starting flyer fetch for ZIP ${zipCode}...`);
 
     const stores = await this.getStoreLocations(zipCode);
-    const flyers = [];
+    const flyer = await this.fetchFlyerForStore(stores[0], zipCode);
+    const flyers = flyer ? [flyer] : [];
 
-    for (const store of stores) {
-      const flyer = await this.fetchFlyerForStore(store, zipCode);
-      if (flyer) {
-        flyers.push(flyer);
-      }
-      await this.delay();
-    }
-
-    console.log(`[PublixFlyerScraper] Fetched ${flyers.length} flyer(s) for ZIP ${zipCode}`);
+    console.log(`[PublixFlyerScraper] Fetched ${flyers.length} flyer(s) with ${flyer?.preExtractedDeals?.length || 0} deals for ZIP ${zipCode}`);
     return flyers;
   }
 }

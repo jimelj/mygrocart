@@ -1,52 +1,27 @@
 /**
  * FoodLionFlyerScraper
  *
- * Fetches Food Lion weekly ad flyer pages for stores near a given ZIP code.
- * Food Lion publishes weekly specials at foodlion.com/weekly-specials and
- * uses Flipp for their digital circular viewer.
+ * Fetches Food Lion weekly ad data using the public Flipp API.
+ * Same pattern as Kroger — no auth required.
+ *
+ * API Flow:
+ * 1. GET backflipp.wishabi.com/flipp/flyers?postal_code=30132 → discover flyer ID
+ * 2. GET dam.flippenterprise.net/api/flipp/flyers/{id}/flyer_items → all deals
  */
 
 const axios = require('axios');
-
-// Known Food Lion store locations near Dallas, GA (ZIP 30132)
-const FOOD_LION_STORES_NEAR_30132 = [
-  {
-    storeId: 'food-lion-dallas-ga-01',
-    name: 'Food Lion',
-    address: '346 W Memorial Dr',
-    city: 'Dallas',
-    state: 'GA',
-    zipCode: '30132',
-    latitude: 33.9225,
-    longitude: -84.8490,
-    storeNum: '2537'
-  },
-  {
-    storeId: 'food-lion-temple-ga-01',
-    name: 'Food Lion',
-    address: '320 Carrollton Hwy',
-    city: 'Temple',
-    state: 'GA',
-    zipCode: '30179',
-    latitude: 33.7362,
-    longitude: -85.0337,
-    storeNum: '2544'
-  }
-];
 
 class FoodLionFlyerScraper {
   constructor(options = {}) {
     this.rateLimitMs = options.rateLimitMs || 1500;
 
     this.httpClient = axios.create({
-      timeout: 20000,
+      timeout: 15000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'application/json'
       }
     });
-
-    this.WEEKLY_AD_URL = 'https://www.foodlion.com/weekly-specials/';
   }
 
   async delay(ms) {
@@ -54,105 +29,151 @@ class FoodLionFlyerScraper {
   }
 
   async getStoreLocations(zipCode) {
-    console.log(`[FoodLionFlyerScraper] Looking up Food Lion stores near ZIP ${zipCode}...`);
-
-    const stores = FOOD_LION_STORES_NEAR_30132.filter(store => {
-      return store.zipCode === zipCode || store.state === 'GA';
-    });
-
-    if (stores.length > 0) {
-      console.log(`[FoodLionFlyerScraper] Found ${stores.length} Food Lion location(s) near ZIP ${zipCode}`);
-      return stores;
-    }
-
-    console.log(`[FoodLionFlyerScraper] No exact match, returning all known Food Lion stores`);
-    return FOOD_LION_STORES_NEAR_30132;
+    return [{ zipCode }];
   }
 
   /**
-   * Try to extract flyer data from Food Lion's weekly specials page.
-   * Food Lion uses Flipp for their digital circular.
+   * Discover the current Food Lion weekly ad flyer ID using Flipp's flyers API.
    */
-  async fetchFlyerMetaFromWebsite() {
+  async discoverFlyerId(zipCode) {
     try {
-      const response = await this.httpClient.get(this.WEEKLY_AD_URL, { timeout: 15000 });
-      const html = response.data;
+      const response = await this.httpClient.get(
+        'https://backflipp.wishabi.com/flipp/flyers',
+        { params: { postal_code: zipCode, locale: 'en-us' } }
+      );
 
-      // Look for Flipp publication data
-      const flippMatch = html.match(/publication[_-]?id["'\s:=]+["']?(\d+)/i);
-      const imageMatches = html.match(/https?:\/\/[^"'\s]+flipp[^"'\s]+\.(jpg|png|webp)/gi);
+      const flyers = response.data?.flyers || response.data || [];
 
-      if (flippMatch) {
-        return { flyerProvider: 'flipp', publicationId: flippMatch[1] };
+      // Find Food Lion weekly ad
+      const foodLionWeekly = flyers.find(f =>
+        (f.merchant || '').toLowerCase().includes('food lion') &&
+        (f.name || '').toLowerCase().includes('weekly')
+      );
+
+      if (foodLionWeekly) {
+        console.log(`[FoodLionFlyerScraper] Found Food Lion Weekly Ad ID: ${foodLionWeekly.id}, valid: ${foodLionWeekly.valid_from} to ${foodLionWeekly.valid_to}`);
+        return foodLionWeekly;
       }
 
-      if (imageMatches && imageMatches.length > 0) {
-        return { imageUrls: [...new Set(imageMatches)].slice(0, 20) };
+      // Fall back to any Food Lion flyer
+      const anyFoodLion = flyers.find(f =>
+        (f.merchant || '').toLowerCase().includes('food lion')
+      );
+
+      if (anyFoodLion) {
+        console.log(`[FoodLionFlyerScraper] Found Food Lion flyer: ${anyFoodLion.id} (${anyFoodLion.name})`);
+        return anyFoodLion;
       }
 
+      console.log(`[FoodLionFlyerScraper] No Food Lion flyers found for ZIP ${zipCode}`);
       return null;
     } catch (err) {
-      console.warn(`[FoodLionFlyerScraper] Could not fetch website meta: ${err.message}`);
+      console.error(`[FoodLionFlyerScraper] Flipp flyers API error: ${err.message}`);
       return null;
+    }
+  }
+
+  /**
+   * Fetch all deal items from a Food Lion flyer via Flipp API.
+   */
+  async fetchFlyerItems(flyerId) {
+    try {
+      const response = await this.httpClient.get(
+        `https://dam.flippenterprise.net/api/flipp/flyers/${flyerId}/flyer_items`,
+        { params: { locale: 'en' } }
+      );
+
+      return response.data || [];
+    } catch (err) {
+      console.error(`[FoodLionFlyerScraper] Flyer items API error: ${err.message}`);
+      return [];
     }
   }
 
   async fetchFlyerForStore(store, zipCode) {
     try {
-      console.log(`[FoodLionFlyerScraper] Fetching weekly ad for Food Lion at ${store.address}, ${store.city}, ${store.state}...`);
+      console.log(`[FoodLionFlyerScraper] Fetching Food Lion weekly ad via Flipp for ZIP ${zipCode}...`);
 
       await this.delay();
 
-      // Food Lion weekly ads typically run Wednesday to Tuesday
-      const now = new Date();
-      const dayOfWeek = now.getDay();
-      const daysToLastWed = (dayOfWeek + 4) % 7;
-      const validFrom = new Date(now);
-      validFrom.setDate(now.getDate() - daysToLastWed);
-      validFrom.setHours(0, 0, 0, 0);
-      const validTo = new Date(validFrom);
-      validTo.setDate(validFrom.getDate() + 6);
-      validTo.setHours(23, 59, 59, 999);
+      // Step 1: Discover current flyer ID
+      const flyerMeta = await this.discoverFlyerId(zipCode);
+      if (!flyerMeta) return null;
 
-      const validFromStr = validFrom.toISOString().split('T')[0];
-      const validToStr = validTo.toISOString().split('T')[0];
+      await this.delay();
 
-      const liveMeta = await this.fetchFlyerMetaFromWebsite();
+      // Step 2: Fetch all deal items
+      const items = await this.fetchFlyerItems(flyerMeta.id);
+      console.log(`[FoodLionFlyerScraper] Got ${items.length} items from Flipp`);
 
-      let imageUrls = [];
+      // Extract deals
+      const deals = [];
+      const imageUrls = [];
 
-      if (liveMeta && liveMeta.imageUrls && liveMeta.imageUrls.length > 0) {
-        imageUrls = liveMeta.imageUrls;
-        console.log(`[FoodLionFlyerScraper] Got ${imageUrls.length} image URLs from website`);
-      } else {
-        // Build Food Lion CDN image URLs using Flipp pattern
-        const dateSlug = validFromStr.replace(/-/g, '');
-        const pageCount = 12;
+      for (const item of items) {
+        if (item.display_type && item.display_type !== 1) continue;
 
-        for (let page = 1; page <= pageCount; page++) {
-          imageUrls.push(
-            `https://dam.flippenterprise.net/flyerkit/publications/foodlion-${dateSlug}/public/page-${page}.jpg`
-          );
+        let salePrice = null;
+        if (item.price) {
+          const priceMatch = String(item.price).match(/\$?([\d]+\.[\d]{2})/);
+          if (priceMatch) salePrice = parseFloat(priceMatch[1]);
+        }
+        if (!salePrice && item.pre_price_text) {
+          const match = String(item.pre_price_text).match(/\$?([\d]+\.[\d]{2})/);
+          if (match) salePrice = parseFloat(match[1]);
+        }
+        if (!salePrice && item.post_price_text) {
+          const match = String(item.post_price_text).match(/\$?([\d]+\.[\d]{2})/);
+          if (match) salePrice = parseFloat(match[1]);
+        }
+
+        const deal = {
+          productName: item.name || '',
+          productBrand: item.brand || null,
+          salePrice,
+          regularPrice: null,
+          unit: 'each',
+          dealType: 'sale',
+          productCategory: null
+        };
+
+        if (deal.productName && deal.salePrice) {
+          deals.push(deal);
+        }
+
+        if (item.cutout_image_url) {
+          imageUrls.push(item.cutout_image_url);
         }
       }
+
+      const thumbnailUrl = flyerMeta.premium_thumbnail_url || flyerMeta.thumbnail_url;
+      if (thumbnailUrl) {
+        imageUrls.unshift(thumbnailUrl);
+      }
+
+      const validFromStr = flyerMeta.valid_from
+        ? new Date(flyerMeta.valid_from).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+      const validToStr = flyerMeta.valid_to
+        ? new Date(flyerMeta.valid_to).toISOString().split('T')[0]
+        : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+      console.log(`[FoodLionFlyerScraper] Extracted ${deals.length} deals for Food Lion`);
 
       return {
         storeName: 'Food Lion',
         storeSlug: 'food-lion',
-        flyerName: 'Weekly Ad',
-        imageUrls,
+        flyerName: flyerMeta.name || 'Weekly Ad',
+        imageUrls: imageUrls.slice(0, 20),
         validFrom: validFromStr,
         validTo: validToStr,
         zipCode,
-        source: 'direct_scrape',
-        storeAddress: store.address,
-        storeCity: store.city,
-        storeState: store.state,
-        storeLatitude: store.latitude,
-        storeLongitude: store.longitude
+        source: 'flipp_api',
+        preExtractedDeals: deals,
+        flippFlyerId: flyerMeta.id
       };
     } catch (error) {
-      console.error(`[FoodLionFlyerScraper] Failed to fetch flyer for Food Lion at ${store.address}: ${error.message}`);
+      console.error(`[FoodLionFlyerScraper] Failed to fetch Food Lion flyer: ${error.message}`);
       return null;
     }
   }
@@ -160,14 +181,11 @@ class FoodLionFlyerScraper {
   async fetchFlyers(zipCode) {
     console.log(`[FoodLionFlyerScraper] Starting flyer fetch for ZIP ${zipCode}...`);
 
-    // Food Lion flyers are regional — fetch one
     const stores = await this.getStoreLocations(zipCode);
-    if (stores.length === 0) return [];
-
     const flyer = await this.fetchFlyerForStore(stores[0], zipCode);
     const flyers = flyer ? [flyer] : [];
 
-    console.log(`[FoodLionFlyerScraper] Fetched ${flyers.length} flyer(s) for ZIP ${zipCode}`);
+    console.log(`[FoodLionFlyerScraper] Fetched ${flyers.length} flyer(s) with ${flyer?.preExtractedDeals?.length || 0} deals for ZIP ${zipCode}`);
     return flyers;
   }
 }
