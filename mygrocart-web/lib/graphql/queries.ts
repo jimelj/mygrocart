@@ -327,6 +327,7 @@ export const GET_DEALS_NEAR_ME = gql`
         savingsPercent
         validFrom
         validTo
+        imageUrl
       }
       totalCount
       hasNextPage

@@ -28,6 +28,14 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'f.wishabi.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'production-endpoint.azureedge.net',
+      },
+      {
+        protocol: 'https',
         hostname: 'res.cloudinary.com',
       },
       {

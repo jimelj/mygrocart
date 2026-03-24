@@ -149,7 +149,8 @@ class AldiFlyerScraper {
           regularPrice: null,
           unit: 'each',
           dealType: 'sale',
-          productCategory: (product.categories || []).join(', ') || null
+          productCategory: (product.categories || []).join(', ') || null,
+          imageUrl: product.image_url || null
         };
 
         if (deal.productName && deal.salePrice) {

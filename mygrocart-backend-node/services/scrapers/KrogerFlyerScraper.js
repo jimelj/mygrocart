@@ -131,7 +131,8 @@ class KrogerFlyerScraper {
           regularPrice: null,
           unit: 'each',
           dealType: 'sale',
-          productCategory: null
+          productCategory: null,
+          imageUrl: item.cutout_image_url || null
         };
 
         if (deal.productName && deal.salePrice) {

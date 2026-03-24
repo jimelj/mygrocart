@@ -141,7 +141,8 @@ class LidlFlyerScraper {
             regularPrice,
             unit,
             dealType: 'sale',
-            productCategory: group.type || group.name || null
+            productCategory: group.type || group.name || null,
+            imageUrl: (product.images && product.images[0]?.url) || null
           };
 
           if (deal.productName && deal.salePrice) {
