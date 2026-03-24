@@ -663,7 +663,21 @@ class FlyerService {
             imageUrls.push(`${this.CDN_BASE_URL}/${flyerPath}4_0_0.jpg`);
           }
         } else {
-          imageUrls.push(`${this.CDN_BASE_URL}/${flyerPath}4_0_0.jpg`);
+          // Save locally when Cloudinary is not configured
+          try {
+            const flyerDir = path.join(__dirname, '..', 'public', 'flyers', String(flyer.flyer_run_id).replace(/[^a-zA-Z0-9-_]/g, '_'));
+            await fs.mkdir(flyerDir, { recursive: true });
+            const filePath = path.join(flyerDir, `page_${i + 1}.jpg`);
+            await fs.writeFile(filePath, pageBuffers[i]);
+            const port = process.env.PORT || 5001;
+            const host = process.env.BACKEND_URL || `http://localhost:${port}`;
+            const localUrl = `${host}/flyers/${String(flyer.flyer_run_id).replace(/[^a-zA-Z0-9-_]/g, '_')}/page_${i + 1}.jpg`;
+            imageUrls.push(localUrl);
+            console.log(`[FlyerService] Saved page ${i + 1}/${pageBuffers.length} locally`);
+          } catch (saveErr) {
+            console.error(`[FlyerService] Local save failed:`, saveErr.message);
+            imageUrls.push(`${this.CDN_BASE_URL}/${flyerPath}4_0_0.jpg`);
+          }
         }
 
         await this.delay(100);
@@ -819,7 +833,7 @@ class FlyerService {
   async downloadFlyerImages(flyer) {
     const TILE_SIZE = 256;
     const MAX_TILES = 120; // Balanced limit for full quality (Render 512MB)
-    const MEDIUM_TILES = 300; // Threshold for medium quality (zoom 4)
+    const MEDIUM_TILES = 10000; // Threshold for medium quality (zoom 4) — wide Flipp flyers have 1000-6000 tiles at zoom 5
 
     try {
       const flyerPath = this.parseFlyerPath(flyer);
@@ -1304,10 +1318,31 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         console.log(`[FlyerService] ${scraperFlyer.storeName} provided ${scraperFlyer.preExtractedDeals.length} pre-extracted deals — skipping OCR`);
         enrichedDeals = scraperFlyer.preExtractedDeals;
 
-        // Still try to validate and upload images if provided (for the flyer viewer)
-        if (scraperFlyer.imageUrls && scraperFlyer.imageUrls.length > 0) {
+        // Generate high-quality flyer page images by stitching tiles
+        if (scraperFlyer.flippPath) {
+          console.log(`[FlyerService] Stitching flyer pages from tiles for ${scraperFlyer.storeName}...`);
+          try {
+            // Build a mock flyer object for downloadFlyerImages
+            const mockFlyer = {
+              merchant: scraperFlyer.storeName,
+              flyer_run_id: flyerRunId,
+              sui: JSON.stringify({
+                fl1_path: scraperFlyer.flippPath,
+                fl1_width: scraperFlyer.flippWidth || 0,
+                fl1_height: scraperFlyer.flippHeight || 0
+              })
+            };
+            cloudinaryUrls = await this.downloadFlyerImages(mockFlyer);
+            console.log(`[FlyerService] Stitched ${cloudinaryUrls.length} page(s) for ${scraperFlyer.storeName}`);
+          } catch (stitchErr) {
+            console.warn(`[FlyerService] Tile stitching failed for ${scraperFlyer.storeName}: ${stitchErr.message}`);
+          }
+        }
+
+        // Fallback: validate and use provided image URLs
+        if (cloudinaryUrls.length === 0 && scraperFlyer.imageUrls && scraperFlyer.imageUrls.length > 0) {
           const validImageUrls = [];
-          for (const url of scraperFlyer.imageUrls.slice(0, 10)) { // Cap at 10 for speed
+          for (const url of scraperFlyer.imageUrls.slice(0, 10)) {
             try {
               const response = await axios.head(url, { timeout: 5000 });
               if (response.status === 200) {

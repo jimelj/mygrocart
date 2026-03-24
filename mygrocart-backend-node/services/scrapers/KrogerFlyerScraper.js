@@ -144,10 +144,13 @@ class KrogerFlyerScraper {
         }
       }
 
-      // Get flyer thumbnail as main image
-      const thumbnailUrl = flyerMeta.premium_thumbnail_url || flyerMeta.thumbnail_url;
-      if (thumbnailUrl) {
-        imageUrls.unshift(thumbnailUrl);
+      // Build flyer image URL — use stock_premium (high-quality full overview)
+      // Construct from flyer ID + timestamp extracted from thumbnail_url
+      const finalImageUrls = [];
+      const thumbnailUrl = flyerMeta.thumbnail_url || '';
+      const timestamp = thumbnailUrl.split('/').pop() || '';
+      if (timestamp) {
+        finalImageUrls.push(`https://f.wishabi.net/flyers/${flyerMeta.id}/stock_premium/${timestamp}`);
       }
 
       const validFromStr = flyerMeta.valid_from
@@ -163,13 +166,16 @@ class KrogerFlyerScraper {
         storeName: 'Kroger',
         storeSlug: 'kroger',
         flyerName: flyerMeta.name || 'Weekly Ad',
-        imageUrls: imageUrls.slice(0, 20),
+        imageUrls: finalImageUrls,
         validFrom: validFromStr,
         validTo: validToStr,
         zipCode,
         source: 'flipp_api',
         preExtractedDeals: deals,
-        flippFlyerId: flyerMeta.id
+        flippFlyerId: flyerMeta.id,
+        flippPath: flyerMeta.path,
+        flippWidth: flyerMeta.width,
+        flippHeight: flyerMeta.height
       };
     } catch (error) {
       console.error(`[KrogerFlyerScraper] Failed to fetch Kroger flyer: ${error.message}`);
