@@ -129,6 +129,7 @@ export default function SearchPage() {
   );
 
   // Extract pagination data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchResult = (data as any)?.searchProducts;
   const products: Product[] = searchResult?.products || [];
   const totalCount = searchResult?.totalCount || 0;

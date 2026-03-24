@@ -51,9 +51,9 @@ function LoginContent() {
     try {
       await login(email, password);
       router.push(returnUrl);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login error:", err);
-      setError(err.message || "Invalid email or password. Please try again.");
+      setError(err instanceof Error ? err.message : "Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -147,7 +147,7 @@ function LoginContent() {
           </CardContent>
           <CardFooter className="flex flex-col space-y-2">
             <div className="text-sm text-gray-500 text-center">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
                 className="text-primary-600 hover:text-primary-700 font-medium hover:underline"

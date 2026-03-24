@@ -229,7 +229,7 @@ export default function AdminDashboard() {
           setFetchStatus({ state: "idle" });
         }, 5000);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to fetch flyers:", err);
       setFetchStatus({
         state: "error",
@@ -251,7 +251,7 @@ export default function AdminDashboard() {
 
   // Status badge components
   const getJobStatusBadge = (status: string) => {
-    const variants: Record<string, { className: string; icon: any }> = {
+    const variants: Record<string, { className: string; icon: React.ReactNode }> = {
       queued: {
         className: "bg-gray-100 text-gray-700",
         icon: <CircleDot className="h-3 w-3 mr-1" />,

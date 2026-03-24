@@ -124,6 +124,7 @@ export default function RequestsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {requests.map((request: any) => (
               <Card key={request.requestId}>
                 <CardContent className="p-4">

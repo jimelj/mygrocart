@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [signupMutation] = useMutation(SIGNUP);
 
   // Load token from localStorage on mount
+  // eslint-disable-next-line react-compiler/react-compiler
   useEffect(() => {
     // Guard against server-side rendering
     if (typeof window === 'undefined') {
