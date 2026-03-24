@@ -36,6 +36,7 @@ interface Deal {
   savingsPercent?: number;
   validFrom?: string;
   validTo?: string;
+  imageUrl?: string;
 }
 
 interface GetDealsNearMeResponse {
@@ -77,6 +78,8 @@ export default function DealsPage() {
   const [sortBy, setSortBy] = useState('savings');
   const [addedItems, setAddedItems] = useState<Set<string>>(new Set());
   const [showSuccess, setShowSuccess] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const DEALS_PER_PAGE = 48;
 
   const zipCode = user?.zipCode || '30132';
 
@@ -85,7 +88,8 @@ export default function DealsPage() {
     variables: {
       zipCode,
       category: selectedCategory === 'All' ? undefined : selectedCategory,
-      limit: 100,
+      limit: DEALS_PER_PAGE,
+      offset: (currentPage - 1) * DEALS_PER_PAGE,
     },
     skip: !isAuthenticated || !user,
   });
@@ -132,6 +136,10 @@ export default function DealsPage() {
   }
 
   const deals: Deal[] = data?.getDealsNearMe?.deals || [];
+  const totalCount = data?.getDealsNearMe?.totalCount || 0;
+  const totalPages = data?.getDealsNearMe?.totalPages || 1;
+  const hasNextPage = data?.getDealsNearMe?.hasNextPage || false;
+  const hasPreviousPage = data?.getDealsNearMe?.hasPreviousPage || false;
 
   // Filter deals by search query and store
   const filteredDeals = deals.filter((deal: Deal) => {
@@ -172,7 +180,7 @@ export default function DealsPage() {
           </div>
           <p className="text-gray-600 flex items-center gap-2">
             <MapPin className="w-4 h-4" />
-            {sortedDeals.length} deals found in {zipCode}
+            {totalCount} deals found in {zipCode}{totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
           </p>
         </div>
 
@@ -214,7 +222,7 @@ export default function DealsPage() {
                       selectedCategory === category ? 'default' : 'outline'
                     }
                     className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
-                    onClick={() => setSelectedCategory(category)}
+                    onClick={() => { setSelectedCategory(category); setCurrentPage(1); }}
                   >
                     {category}
                   </Badge>
@@ -332,21 +340,70 @@ export default function DealsPage() {
 
         {/* Deals grid */}
         {!loading && !error && sortedDeals.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedDeals.map((deal: Deal) => (
-              <DealCard
-                key={deal.id}
-                deal={deal}
-                onClick={() => {}}
-                onAddToList={
-                  addedItems.has(deal.id)
-                    ? undefined
-                    : () => handleAddToList(deal)
-                }
-                isAdded={addedItems.has(deal.id)}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {sortedDeals.map((deal: Deal) => (
+                <DealCard
+                  key={deal.id}
+                  deal={deal}
+                  onClick={() => {}}
+                  onAddToList={
+                    addedItems.has(deal.id)
+                      ? undefined
+                      : () => handleAddToList(deal)
+                  }
+                  isAdded={addedItems.has(deal.id)}
+                />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setCurrentPage(p => p - 1); window.scrollTo(0, 0); }}
+                  disabled={!hasPreviousPage}
+                >
+                  Previous
+                </Button>
+
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let page: number;
+                  if (totalPages <= 7) {
+                    page = i + 1;
+                  } else if (currentPage <= 4) {
+                    page = i + 1;
+                  } else if (currentPage >= totalPages - 3) {
+                    page = totalPages - 6 + i;
+                  } else {
+                    page = currentPage - 3 + i;
+                  }
+                  return (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => { setCurrentPage(page); window.scrollTo(0, 0); }}
+                      className={currentPage === page ? 'bg-primary-500 hover:bg-primary-600' : ''}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setCurrentPage(p => p + 1); window.scrollTo(0, 0); }}
+                  disabled={!hasNextPage}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
