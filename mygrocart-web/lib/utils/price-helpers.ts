@@ -1,5 +1,7 @@
 interface StorePrice {
   price: number | string;
+  store?: { chainName?: string };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -57,7 +59,7 @@ export function calculateCheapestSubtotal(
     const price = typeof sp.price === 'string' ? parseFloat(sp.price) : sp.price;
     if (!isNaN(price) && price < minPrice) {
       minPrice = price;
-      cheapestStore = (sp as any).store?.chainName || 'N/A';
+      cheapestStore = sp.store?.chainName || 'N/A';
     }
   });
 

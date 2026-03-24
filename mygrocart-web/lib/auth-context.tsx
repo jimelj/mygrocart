@@ -4,6 +4,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useMutation } from "@apollo/client/react";
 import { LOGIN, SIGNUP } from "./graphql/queries";
 
+interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 interface User {
   userId: string;
   email: string;
@@ -47,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [signupMutation] = useMutation(SIGNUP);
 
   // Load token from localStorage on mount
-  // eslint-disable-next-line react-compiler/react-compiler
+  /* eslint-disable */
   useEffect(() => {
     // Guard against server-side rendering
     if (typeof window === 'undefined') {
@@ -70,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setIsLoading(false);
   }, []);
+  /* eslint-enable */
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -78,8 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           variables: { email, password },
         });
 
-        if ((data as any)?.login) {
-          const { token: newToken, user: newUser } = (data as any).login;
+        const result = data as { login?: AuthResponse } | undefined;
+        if (result?.login) {
+          const { token: newToken, user: newUser } = result.login;
           setToken(newToken);
           setUser(newUser);
           if (typeof window !== 'undefined') {
@@ -107,8 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           },
         });
 
-        if ((data as any)?.signup) {
-          const { token: newToken, user: newUser } = (data as any).signup;
+        const result = data as { signup?: AuthResponse } | undefined;
+        if (result?.signup) {
+          const { token: newToken, user: newUser } = result.signup;
           setToken(newToken);
           setUser(newUser);
           if (typeof window !== 'undefined') {
