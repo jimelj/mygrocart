@@ -233,7 +233,7 @@ export default function AdminDashboard() {
       console.error("Failed to fetch flyers:", err);
       setFetchStatus({
         state: "error",
-        message: err.message || "Failed to fetch flyers",
+        message: err instanceof Error ? err.message : "Failed to fetch flyers",
       });
 
       // Reset status after 5 seconds
