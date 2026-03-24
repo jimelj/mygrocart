@@ -1319,7 +1319,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         enrichedDeals = scraperFlyer.preExtractedDeals;
 
         // Generate high-quality flyer page images by stitching tiles
-        if (scraperFlyer.flippPath) {
+        if (scraperFlyer.flippPath && !process.env.DISABLE_TILE_STITCHING) {
           console.log(`[FlyerService] Stitching flyer pages from tiles for ${scraperFlyer.storeName}...`);
           try {
             // Build a mock flyer object for downloadFlyerImages
