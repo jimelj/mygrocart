@@ -87,7 +87,7 @@ function LoginContent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} action="#" method="post" className="space-y-4">
               {/* Error Alert */}
               {error && (
                 <Alert variant="destructive">
