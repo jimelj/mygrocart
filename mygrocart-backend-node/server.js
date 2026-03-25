@@ -1,4 +1,5 @@
 const express = require('express');
+// MyGroCart Backend - Node.js + Express + Apollo Server + GraphQL
 const { ApolloServer } = require('@apollo/server');
 const { expressMiddleware } = require('@apollo/server/express4');
 const { ApolloServerPluginDrainHttpServer } = require('@apollo/server/plugin/drainHttpServer');
