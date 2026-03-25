@@ -10,6 +10,10 @@ const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 
+// Limit sharp memory usage to stay within Render free tier (512MB)
+sharp.cache({ memory: 50 }); // Max 50MB for sharp cache
+sharp.concurrency(1); // Process one image at a time
+
 // Configure Cloudinary (reads from CLOUDINARY_URL env var)
 cloudinary.config();
 
@@ -1305,7 +1309,8 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
    */
   async stitchFlyerPerPage(flyerId, flyerPath, flyerWidth, flyerHeight, flyerRunId, storeName) {
     const TILE_SIZE = 256;
-    const ZOOM = 4; // Good quality, reasonable tile count
+    // Zoom 3 in production (fewer tiles, ~4MB peak per page) vs zoom 4 in dev (higher quality)
+    const ZOOM = process.env.NODE_ENV === 'production' ? 3 : 4;
     const CDN_BASE = 'https://f.wishabi.net/';
 
     try {
@@ -1323,17 +1328,15 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
       // Sort pages by left coordinate (left-to-right order)
       pages = pages.sort((a, b) => a.left - b.left);
 
-      // Step 2: Calculate zoom 4 scale from flyer dimensions
-      // At zoom 4, tiles are smaller — calculate how many native pixels each tile covers
-      const totalColsZoom5 = Math.ceil(flyerWidth / TILE_SIZE);
-      const totalColsZoom4 = Math.ceil(totalColsZoom5 / 2);
-      const tileNativeWidth = flyerWidth / totalColsZoom4;
+      // Calculate tile grid at the selected zoom level
+      // Zoom 5 is full resolution, each lower zoom halves the grid
+      const zoomDivisor = Math.pow(2, 5 - ZOOM);
+      const totalCols = Math.ceil(Math.ceil(flyerWidth / TILE_SIZE) / zoomDivisor);
+      const totalRows = Math.ceil(Math.ceil(flyerHeight / TILE_SIZE) / zoomDivisor);
+      const tileNativeWidth = flyerWidth / totalCols;
+      const tileNativeHeight = flyerHeight / totalRows;
 
-      const totalRowsZoom5 = Math.ceil(flyerHeight / TILE_SIZE);
-      const totalRowsZoom4 = Math.ceil(totalRowsZoom5 / 2);
-      const tileNativeHeight = flyerHeight / totalRowsZoom4;
-
-      console.log(`[FlyerService] Per-page stitching: ${pages.length} pages, ${totalColsZoom4}x${totalRowsZoom4} tiles at zoom ${ZOOM}`);
+      console.log(`[FlyerService] Per-page stitching: ${pages.length} pages, ${totalCols}x${totalRows} tiles at zoom ${ZOOM} for ${storeName}`);
 
       // Step 3: Process each page individually
       const imageUrls = [];
@@ -1343,10 +1346,10 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
       for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
         const page = pages[pageIdx];
         const startCol = Math.floor(page.left / tileNativeWidth);
-        const endCol = Math.min(Math.ceil(page.right / tileNativeWidth), totalColsZoom4);
+        const endCol = Math.min(Math.ceil(page.right / tileNativeWidth), totalCols);
         const pageCols = endCol - startCol;
 
-        // Skip pages that are too wide (likely a spread — cap at 12 tiles wide)
+        // Skip pages that are too wide (likely a spread)
         if (pageCols > 12) {
           console.log(`[FlyerService] Skipping oversized page ${page.page} (${pageCols} tiles wide)`);
           continue;
@@ -1355,7 +1358,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         // Download tiles for this page only
         const tiles = [];
         for (let col = startCol; col < endCol; col++) {
-          for (let row = 0; row < totalRowsZoom4; row++) {
+          for (let row = 0; row < totalRows; row++) {
             const tileUrl = `${CDN_BASE}${flyerPath}${ZOOM}_${col}_${row}.jpg`;
             try {
               const response = await axios.get(tileUrl, { responseType: 'arraybuffer', timeout: 8000 });
@@ -1371,19 +1374,19 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
 
         // Stitch this page's tiles into one image
         const canvasWidth = pageCols * TILE_SIZE;
-        const canvasHeight = totalRowsZoom4 * TILE_SIZE;
+        const canvasHeight = totalRows * TILE_SIZE;
 
         const compositeOps = tiles.map(tile => ({
           input: tile.data,
           left: tile.col * TILE_SIZE,
-          top: (totalRowsZoom4 - 1 - tile.row) * TILE_SIZE // Row 0 is at bottom
+          top: (totalRows - 1 - tile.row) * TILE_SIZE // Row 0 is at bottom
         }));
 
-        const pageBuffer = await sharp({
+        let pageBuffer = await sharp({
           create: { width: canvasWidth, height: canvasHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
         })
         .composite(compositeOps)
-        .jpeg({ quality: 85 })
+        .jpeg({ quality: 80 })
         .toBuffer();
 
         // Free tile memory immediately
@@ -1412,11 +1415,12 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
           imageUrls.push(`${host}/flyers/${flyerRunId.replace(/[^a-zA-Z0-9-_]/g, '_')}/page_${pageIdx + 1}.jpg`);
         }
 
-        console.log(`[FlyerService] Page ${pageIdx + 1}/${pages.length}: ${pageCols}x${totalRowsZoom4} tiles stitched`);
+        console.log(`[FlyerService] Page ${pageIdx + 1}/${pages.length}: ${pageCols}x${totalRows} tiles stitched`);
 
-        // Explicitly free buffer
-        // (pageBuffer goes out of scope on next iteration)
-        await this.delay(100);
+        // Free buffer and hint GC
+        pageBuffer = null;
+        if (global.gc) global.gc();
+        await this.delay(200); // Allow GC to run between pages
       }
 
       return imageUrls;
@@ -1454,7 +1458,8 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         console.log(`[FlyerService] ${scraperFlyer.storeName} provided ${scraperFlyer.preExtractedDeals.length} pre-extracted deals — skipping OCR`);
         enrichedDeals = scraperFlyer.preExtractedDeals;
 
-        // Generate flyer page images by stitching tiles per-page (memory-safe)
+        // Generate flyer page images by stitching tiles per-page
+        // Production uses zoom 3 (fewer tiles, lower memory) to stay within 512MB
         if (scraperFlyer.flippPath && scraperFlyer.flippFlyerId) {
           console.log(`[FlyerService] Stitching flyer pages for ${scraperFlyer.storeName}...`);
           try {
@@ -1472,7 +1477,7 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
           }
         }
 
-        // Fallback: validate and use provided image URLs
+        // Use provided image URLs (stock_premium overview images from Flipp)
         if (cloudinaryUrls.length === 0 && scraperFlyer.imageUrls && scraperFlyer.imageUrls.length > 0) {
           const validImageUrls = [];
           for (const url of scraperFlyer.imageUrls.slice(0, 10)) {
@@ -1571,7 +1576,9 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
           } catch (err) {
             console.error(`[FlyerService] Scraper flyer processing error:`, err.message);
           }
-          await this.delay(this.requestDelay);
+          // Allow memory to settle between stores (important for 512MB Render)
+          if (global.gc) global.gc();
+          await this.delay(2000);
         }
         console.log(`[FlyerService] Direct scrapers: ${scraperProcessed} new flyers, ${scraperDeals} deals`);
       }

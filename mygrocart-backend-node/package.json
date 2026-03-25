@@ -4,7 +4,7 @@
   "description": "MyGroCart Backend API - Node.js with Express, Apollo Server, GraphQL, and Web Scraping",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node --expose-gc --max-old-space-size=384 server.js",
     "dev": "nodemon -r dotenv/config server.js",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -171,21 +171,21 @@ jobs:
             -H "Accept: application/json" \
             -H "Content-Type: application/json"
 
-      - name: Wait for deployment
-        run: sleep 60
-
-      - name: Health check
+      - name: Health check (with retries)
         run: |
-          # Try to hit the /graphql endpoint
-          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_URL }}/graphql" || echo "000")
-
-          if [ "$response" = "400" ] || [ "$response" = "200" ]; then
-            echo "✅ Backend is responding (HTTP $response)"
-            exit 0
-          else
-            echo "❌ Backend health check failed (HTTP $response)"
-            exit 1
-          fi
+          # Render free tier cold starts can take 2-3 minutes
+          for i in 1 2 3 4 5 6; do
+            echo "Attempt $i/6 — checking /health endpoint..."
+            response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.BACKEND_URL }}/health" || echo "000")
+            if [ "$response" = "200" ]; then
+              echo "Backend is responding (HTTP $response)"
+              exit 0
+            fi
+            echo "Got HTTP $response, waiting 30s before retry..."
+            sleep 30
+          done
+          echo "Backend health check failed after 6 attempts"
+          exit 1
 
   post-deploy-notification:
     name: Post-Deploy Notification
