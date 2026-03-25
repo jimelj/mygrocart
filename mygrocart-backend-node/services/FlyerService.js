@@ -1290,6 +1290,142 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
    * @param {object} scraperFlyer - Flyer object from a direct scraper
    * @returns {Promise<object>} Processing result { success, dealsCount }
    */
+  /**
+   * Stitch flyer tiles into page images ONE PAGE AT A TIME.
+   * Memory-safe: processes ~20-60 tiles per page (~4-15MB canvas), frees memory between pages.
+   * Uses Flipp flyer_pages API to get page boundaries, then downloads only the tiles for each page.
+   *
+   * @param {number} flyerId - Flipp flyer ID (for flyer_pages API)
+   * @param {string} flyerPath - CDN tile path (e.g., "flyers/abc-123/")
+   * @param {number} flyerWidth - Full flyer width in native pixels
+   * @param {number} flyerHeight - Full flyer height in native pixels
+   * @param {string} flyerRunId - Unique run ID for saving
+   * @param {string} storeName - Store name for logging
+   * @returns {Promise<Array<string>>} Array of page image URLs
+   */
+  async stitchFlyerPerPage(flyerId, flyerPath, flyerWidth, flyerHeight, flyerRunId, storeName) {
+    const TILE_SIZE = 256;
+    const ZOOM = 4; // Good quality, reasonable tile count
+    const CDN_BASE = 'https://f.wishabi.net/';
+
+    try {
+      // Step 1: Get page boundaries from Flipp API
+      const pagesRes = await axios.get(
+        `https://dam.flippenterprise.net/api/flipp/flyers/${flyerId}/flyer_pages`,
+        { params: { locale: 'en' }, timeout: 10000 }
+      );
+      let pages = pagesRes.data;
+      if (!Array.isArray(pages) || pages.length === 0) {
+        console.warn(`[FlyerService] No pages found for flyer ${flyerId}`);
+        return [];
+      }
+
+      // Sort pages by left coordinate (left-to-right order)
+      pages = pages.sort((a, b) => a.left - b.left);
+
+      // Step 2: Calculate zoom 4 scale from flyer dimensions
+      // At zoom 4, tiles are smaller — calculate how many native pixels each tile covers
+      const totalColsZoom5 = Math.ceil(flyerWidth / TILE_SIZE);
+      const totalColsZoom4 = Math.ceil(totalColsZoom5 / 2);
+      const tileNativeWidth = flyerWidth / totalColsZoom4;
+
+      const totalRowsZoom5 = Math.ceil(flyerHeight / TILE_SIZE);
+      const totalRowsZoom4 = Math.ceil(totalRowsZoom5 / 2);
+      const tileNativeHeight = flyerHeight / totalRowsZoom4;
+
+      console.log(`[FlyerService] Per-page stitching: ${pages.length} pages, ${totalColsZoom4}x${totalRowsZoom4} tiles at zoom ${ZOOM}`);
+
+      // Step 3: Process each page individually
+      const imageUrls = [];
+      const flyerDir = path.join(__dirname, '..', 'public', 'flyers', flyerRunId.replace(/[^a-zA-Z0-9-_]/g, '_'));
+      await fs.mkdir(flyerDir, { recursive: true });
+
+      for (let pageIdx = 0; pageIdx < pages.length; pageIdx++) {
+        const page = pages[pageIdx];
+        const startCol = Math.floor(page.left / tileNativeWidth);
+        const endCol = Math.min(Math.ceil(page.right / tileNativeWidth), totalColsZoom4);
+        const pageCols = endCol - startCol;
+
+        // Skip pages that are too wide (likely a spread — cap at 12 tiles wide)
+        if (pageCols > 12) {
+          console.log(`[FlyerService] Skipping oversized page ${page.page} (${pageCols} tiles wide)`);
+          continue;
+        }
+
+        // Download tiles for this page only
+        const tiles = [];
+        for (let col = startCol; col < endCol; col++) {
+          for (let row = 0; row < totalRowsZoom4; row++) {
+            const tileUrl = `${CDN_BASE}${flyerPath}${ZOOM}_${col}_${row}.jpg`;
+            try {
+              const response = await axios.get(tileUrl, { responseType: 'arraybuffer', timeout: 8000 });
+              tiles.push({ col: col - startCol, row, data: Buffer.from(response.data) });
+            } catch {
+              // Tile doesn't exist — skip
+            }
+          }
+          await this.delay(50); // Small delay between columns
+        }
+
+        if (tiles.length === 0) continue;
+
+        // Stitch this page's tiles into one image
+        const canvasWidth = pageCols * TILE_SIZE;
+        const canvasHeight = totalRowsZoom4 * TILE_SIZE;
+
+        const compositeOps = tiles.map(tile => ({
+          input: tile.data,
+          left: tile.col * TILE_SIZE,
+          top: (totalRowsZoom4 - 1 - tile.row) * TILE_SIZE // Row 0 is at bottom
+        }));
+
+        const pageBuffer = await sharp({
+          create: { width: canvasWidth, height: canvasHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
+        })
+        .composite(compositeOps)
+        .jpeg({ quality: 85 })
+        .toBuffer();
+
+        // Free tile memory immediately
+        tiles.length = 0;
+
+        // Save locally or to Cloudinary
+        if (process.env.CLOUDINARY_URL) {
+          try {
+            const result = await new Promise((resolve, reject) => {
+              const uploadStream = cloudinary.uploader.upload_stream(
+                { folder: `flyers/${flyerRunId}`, public_id: `page_${pageIdx + 1}`, resource_type: 'image', overwrite: true },
+                (error, result) => { if (error) reject(error); else resolve(result); }
+              );
+              uploadStream.end(pageBuffer);
+            });
+            imageUrls.push(result.secure_url);
+          } catch (uploadErr) {
+            console.warn(`[FlyerService] Cloudinary upload failed for page ${pageIdx + 1}: ${uploadErr.message}`);
+          }
+        } else {
+          // Save locally
+          const filePath = path.join(flyerDir, `page_${pageIdx + 1}.jpg`);
+          await fs.writeFile(filePath, pageBuffer);
+          const port = process.env.PORT || 5001;
+          const host = process.env.BACKEND_URL || `http://localhost:${port}`;
+          imageUrls.push(`${host}/flyers/${flyerRunId.replace(/[^a-zA-Z0-9-_]/g, '_')}/page_${pageIdx + 1}.jpg`);
+        }
+
+        console.log(`[FlyerService] Page ${pageIdx + 1}/${pages.length}: ${pageCols}x${totalRowsZoom4} tiles stitched`);
+
+        // Explicitly free buffer
+        // (pageBuffer goes out of scope on next iteration)
+        await this.delay(100);
+      }
+
+      return imageUrls;
+    } catch (error) {
+      console.error(`[FlyerService] Per-page stitching failed for ${storeName}: ${error.message}`);
+      return [];
+    }
+  }
+
   async processScraperFlyer(scraperFlyer) {
     try {
       // Generate a unique flyerRunId from scraper data
@@ -1318,21 +1454,18 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
         console.log(`[FlyerService] ${scraperFlyer.storeName} provided ${scraperFlyer.preExtractedDeals.length} pre-extracted deals — skipping OCR`);
         enrichedDeals = scraperFlyer.preExtractedDeals;
 
-        // Generate high-quality flyer page images by stitching tiles
-        if (scraperFlyer.flippPath && !process.env.DISABLE_TILE_STITCHING) {
-          console.log(`[FlyerService] Stitching flyer pages from tiles for ${scraperFlyer.storeName}...`);
+        // Generate flyer page images by stitching tiles per-page (memory-safe)
+        if (scraperFlyer.flippPath && scraperFlyer.flippFlyerId) {
+          console.log(`[FlyerService] Stitching flyer pages for ${scraperFlyer.storeName}...`);
           try {
-            // Build a mock flyer object for downloadFlyerImages
-            const mockFlyer = {
-              merchant: scraperFlyer.storeName,
-              flyer_run_id: flyerRunId,
-              sui: JSON.stringify({
-                fl1_path: scraperFlyer.flippPath,
-                fl1_width: scraperFlyer.flippWidth || 0,
-                fl1_height: scraperFlyer.flippHeight || 0
-              })
-            };
-            cloudinaryUrls = await this.downloadFlyerImages(mockFlyer);
+            cloudinaryUrls = await this.stitchFlyerPerPage(
+              scraperFlyer.flippFlyerId,
+              scraperFlyer.flippPath,
+              scraperFlyer.flippWidth || 0,
+              scraperFlyer.flippHeight || 0,
+              flyerRunId,
+              scraperFlyer.storeName
+            );
             console.log(`[FlyerService] Stitched ${cloudinaryUrls.length} page(s) for ${scraperFlyer.storeName}`);
           } catch (stitchErr) {
             console.warn(`[FlyerService] Tile stitching failed for ${scraperFlyer.storeName}: ${stitchErr.message}`);
@@ -1444,6 +1577,24 @@ Example: [{"product_name": "Whole Milk", "brand": "Horizon", "sale_price": 3.99,
       }
 
       // Step 1: Also fetch flyers from WeeklyAds2 as supplemental source
+      // Skip in production — our scrapers cover all stores, and WeeklyAds2 tile processing is memory-heavy
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`[FlyerService] Skipping WeeklyAds2 in production (scrapers cover all stores)`);
+        const totalFlyersProcessed = scraperProcessed;
+        const totalNewFlyers = scraperProcessed;
+        return {
+          success: true,
+          zipCode,
+          flyersFound: scraperFlyers.length,
+          flyersProcessed: totalFlyersProcessed,
+          newFlyers: totalNewFlyers,
+          totalDeals: scraperDeals,
+          scraperFlyers: scraperProcessed,
+          scraperDeals,
+          weeklyAds2Flyers: 0,
+          message: `Processed ${totalFlyersProcessed} flyers (${scraperProcessed} direct) with ${scraperDeals} deals`
+        };
+      }
       const allFlyers = await this.fetchFlyersForZip(zipCode);
 
       // Step 2: Filter to grocery stores
